@@ -71,14 +71,15 @@ var (
 // TemplateFuncMap returns a template.FuncMap with the style functions
 func TemplateFuncMap() template.FuncMap {
 	return template.FuncMap{
-		"Active":  RenderActiveString,
-		"Passive": RenderPassiveString,
-		"Warning": RenderWarningString,
-		"Blue":    RenderBlueString,
-		"Orange":  RenderOrangeString,
-		"Purple":  RenderPurpleString,
-		"Message": RenderMessageString,
-		"Join":    strings.Join,
+		"Active":    RenderActiveString,
+		"Passive":   RenderPassiveString,
+		"Warning":   RenderWarningString,
+		"Blue":      RenderBlueString,
+		"Orange":    RenderOrangeString,
+		"Purple":    RenderPurpleString,
+		"Message":   RenderMessageString,
+		"LightGrey": RenderLightGreyString,
+		"Join":      strings.Join,
 	}
 }
 

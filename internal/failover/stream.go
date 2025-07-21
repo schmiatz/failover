@@ -178,7 +178,7 @@ func (s *Stream) ConfirmFailover() (err error) {
 	maps.Copy(funcMap, style.TemplateFuncMap())
 
 	tpl := template.New("confirmFailoverTpl").Funcs(funcMap)
-	tpl, err = tpl.Parse(`Version: {{ .AppVersion }}
+	tpl, err = tpl.Parse(`{{ Purple "solana-validator-failover v" }}{{ Purple .AppVersion }}
 {{ .SummaryTable }}
 
 {{/* Clear warning when not a drill i.e not a dry run */}}
@@ -190,17 +190,18 @@ func (s *Stream) ConfirmFailover() (err error) {
 {{- end }}
 
 Failing over will:
-1. {{ if .IsDryRun }}{{ Blue (dry-run) }} {{ end }}Set {{ Active .ActiveNodeInfo.Hostname false }} {{ Active "(them)" false }} to {{ Passive "PASSIVE" false }} {{ Passive .ActiveNodeInfo.Identities.Passive.Pubkey false }} with command:
 
-    {{ .ActiveNodeInfo.SetIdentityCommand }}
+1. {{ if .IsDryRun }}{{ Blue "(dry-run)" }} {{ end }}Set {{ Active "(them)" false }} {{ Active .ActiveNodeInfo.Hostname false }} to {{ Passive "PASSIVE" false }} {{ Passive .ActiveNodeInfo.Identities.Passive.Pubkey false }} with command:
 
-2. Sync tower file from {{ Active .ActiveNodeInfo.Hostname false }} {{ Active "(them)" false }} to {{ Passive "(us)" false }} {{ Passive .PassiveNodeInfo.Hostname false }} at:
+    {{ LightGrey .ActiveNodeInfo.SetIdentityCommand }}
 
-    {{ .PassiveNodeInfo.TowerFile }}
+2. Sync tower file from {{ Active "(them)" false }} {{ Active .ActiveNodeInfo.Hostname false }} to {{ Passive "(us)" false }} {{ Passive .PassiveNodeInfo.Hostname false }} at:
 
-3. {{ if .IsDryRun }}{{ Blue (dry-run) }} {{ end }}Set {{ Passive .PassiveNodeInfo.Hostname false }} {{ Passive "(us)" false }} to {{ Active "ACTIVE" false }} {{ Active .PassiveNodeInfo.Identities.Active.Pubkey false }} with command:
+    {{ LightGrey .PassiveNodeInfo.TowerFile }}
 
-    {{ .PassiveNodeInfo.SetIdentityCommand }}
+3. {{ if .IsDryRun }}{{ Blue "(dry-run)" }} {{ end }}Set {{ Passive "(us)" false }} {{ Passive .PassiveNodeInfo.Hostname false }} to {{ Active "ACTIVE" false }} {{ Active .PassiveNodeInfo.Identities.Active.Pubkey false }} with command:
+
+    {{ LightGrey .PassiveNodeInfo.SetIdentityCommand }}
 
 4. Exit
 `)
