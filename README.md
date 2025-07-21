@@ -2,23 +2,19 @@
 
 Simple p2p Solana validator failovers
 
-![solanna-validator-failover-passive-to-active](vhs/failover-passive-to-active.gif)
-
-![solanna-validator-failover-active-to-passive](vhs/failover-active-to-passive.gif)
-
 A simple QUIC-based program to failover between Solana validators safely and quickly. [This post](https://blog.solstrategies.io/quic-solana-validator-failovers-738d712ac737) explains some background in more detail. In summary this program orchestrates the three-step process of failing over from an active (voting) to a passive (non-voting) validator:
 
 1. active validator sets identity to passive
 2. tower file synced from active to passive validator
 3. passive validator sets identity to active
 
-The following safety checks and convenience features of note are currently provided:
+Start a failover server on the passive node:
 
-1. (optional) pre and post-failover hooks to run as required
-2. ensuring each validator is healthy before initiating the failover process
-3. (informed) guess of  _"the right"_ time in a slot to failover
-4. waiting for no active validator leader slots in the near future before initiating the failover process
-5. detailed failover stage timing
+![solanna-validator-failover-passive-to-active](vhs/failover-passive-to-active.gif)
+
+Start a failover client on the active node to hand over to the passive node:
+
+![solanna-validator-failover-active-to-passive](vhs/failover-active-to-passive.gif)
 
 ## Usage
 
