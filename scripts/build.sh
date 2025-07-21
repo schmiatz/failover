@@ -47,14 +47,15 @@ go_build() {
         arch=$(echo "${osarch}" | cut -d '-' -f2)
         binOutput="${BUILD_DIR}/${APP_NAME}-${APP_VERSION}-${os}-${arch}"
         log_info "building ${binOutput}"
-        log_info "writing version ${APP_VERSION} -> pkg/constants/app.version"
-        echo "${APP_VERSION}" >"pkg/constants/app.version"
         GOOS=${os} GOARCH=${arch} CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o "${binOutput}" || exit 1
         log_info "building ${binOutput} - complete"
-        # create sha256 checksum
         if [ "${CI}" = "true" ]; then
+            # create sha256 checksum
             sha256sum "${binOutput}" > "${binOutput}.sha256"
             log_info "created sha256 checksum for ${binOutput}"
+            # create gzipped binary
+            gzip -9 "${binOutput}"
+            log_info "created gzipped binary for ${binOutput}"
         fi
     done
 }
@@ -64,6 +65,11 @@ main() {
     log_info "APP_VERSION=${APP_VERSION}"
     log_info "BUILD_OS_ARCH_LIST=${BUILD_OS_ARCH_LIST}"
     log_info "CI=${CI}"
+    
+    # Write version file early so it's available for linting and testing
+    log_info "writing version ${APP_VERSION} -> pkg/constants/app.version"
+    echo "${APP_VERSION}" >"pkg/constants/app.version"
+    
     go_tidy
     go_lint
     go_fmt

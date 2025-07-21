@@ -44,20 +44,8 @@ gh_release_upload_assets() {
     log_info "uploading release assets"
     cd bin
     
-    # Compress and upload binaries
+    # Upload all files
     for file in *; do
-        if [ -f "$file" ] && [ ! -f "${file}.gz" ] && [ ! -f "${file}.sha256" ]; then
-            echo "Compressing $file..."
-            gzip -9 "$file"
-            echo "Uploading ${file}.gz..."
-            gh release upload ${REPO_TAG} "${file}.gz" \
-                --repo ${GITHUB_REPO} \
-                --clobber
-        fi
-    done
-    
-    # Upload checksum files without compression
-    for file in *.sha256; do
         if [ -f "$file" ]; then
             echo "Uploading $file..."
             gh release upload ${REPO_TAG} "$file" \
