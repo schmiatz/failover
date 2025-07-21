@@ -1,0 +1,14 @@
+.vscode
+bin/
+test/
+inventory
+.idea/
+# pkg/constants/app.version
+tmp*
+tmp*/
+local-test/**/*.bin
+local-test/**/*.json
+pkg/constants/app.version
+scripts/air-cmd.sh
+release-notes.md
+vhs/*.tape

@@ -1,0 +1,37 @@
+sequenceDiagram
+    actor PA as Human
+    participant P as Passive Validator
+    participant A as Active Validator
+    actor AA as Human
+
+    Note over PA,P: Server setup
+    PA->>P: Start failover server
+    P->>P: Wait for health check
+    P->>P: Wait for active connection
+
+    Note over AA,A: Client setup
+    AA->>A: Start failover client
+    A->>A: Wait for health check
+    A->>AA: Select passive
+    AA->>A: Confirm passive
+    A->>P: Connect to passive
+    P->>A: Connect to active
+    A->>A: Wait for failover signal
+
+    Note over P,A: Pre-failover
+    P->>PA: Request confirmation
+    PA->>P: Confirm failover
+    P->>A: Send failover instruction
+
+    Note over A: Failover
+    A->>A: Check for upcoming leader slots
+    A->>A: Wait for start of next slot
+    A->>A: Set identity to passive
+    A->>P: Transfer tower file
+    A->>A: Exit
+    P->>P: Write tower file to disk
+    P->>P: Set identity to active
+
+    Note over P: Post-failover
+    P->>P: Monitor state
+    P->>P: Exit 

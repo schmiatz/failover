@@ -1,0 +1,513 @@
+package failover
+
+import (
+	"bytes"
+	"context"
+	"encoding/gob"
+	"fmt"
+	"maps"
+	"strings"
+	"text/template"
+	"time"
+
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/huh/spinner"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
+	"github.com/dustin/go-humanize"
+	"github.com/quic-go/quic-go"
+	"github.com/rs/zerolog/log"
+	"github.com/sol-strategies/solana-validator-failover/internal/solana"
+	"github.com/sol-strategies/solana-validator-failover/internal/style"
+	pkgconstants "github.com/sol-strategies/solana-validator-failover/pkg/constants"
+)
+
+// Stream is the message sent from the active node to the passive node (server) to initiate the failover process
+type Stream struct {
+	message Message
+	Stream  quic.Stream
+	decoder *gob.Decoder
+	encoder *gob.Encoder
+}
+
+// NewFailoverStream creates a new FailoverStream from a QUIC stream
+func NewFailoverStream(stream quic.Stream) *Stream {
+	decoder := gob.NewDecoder(stream)
+	encoder := gob.NewEncoder(stream)
+
+	return &Stream{
+		Stream:  stream,
+		decoder: decoder,
+		encoder: encoder,
+		message: Message{
+			CreditSamples: make(CreditSamples),
+		},
+	}
+}
+
+// Encode encodes the FailoverStream into the stream
+func (s *Stream) Encode() error {
+	err := s.encoder.Encode(s.message)
+	if err != nil {
+		log.Err(err).Msg("failed to encode failover message")
+		return err
+	}
+	return nil
+}
+
+// Decode decodes the FailoverStream from the stream
+func (s *Stream) Decode() error {
+	err := s.decoder.Decode(&s.message)
+	if err != nil {
+		log.Err(err).Msg("failed to decode failover message")
+		return err
+	}
+	return nil
+}
+
+// GetCanProceed returns whether the failover can proceed
+func (s *Stream) GetCanProceed() bool {
+	return s.message.CanProceed
+}
+
+// SetCanProceed sets whether the failover can proceed
+func (s *Stream) SetCanProceed(canProceed bool) {
+	s.message.CanProceed = canProceed
+}
+
+// GetErrorMessage returns the error message
+func (s *Stream) GetErrorMessage() string {
+	return s.message.ErrorMessage
+}
+
+// SetErrorMessage sets the error message
+func (s *Stream) SetErrorMessage(errorMessage string) {
+	s.message.ErrorMessage = errorMessage
+}
+
+// SetErrorMessagef sets the error message with a formatted string
+func (s *Stream) SetErrorMessagef(format string, a ...any) {
+	s.message.ErrorMessage = fmt.Sprintf(format, a...)
+}
+
+// LogErrorWithSetMessagef logs an error with a formatted string and sets the error message
+func (s *Stream) LogErrorWithSetMessagef(format string, a ...any) {
+	log.Error().Msgf(format, a...)
+	s.SetErrorMessagef(format, a...)
+}
+
+// SetPassiveNodeInfo sets the passive node info
+func (s *Stream) SetPassiveNodeInfo(passiveNodeInfo *NodeInfo) {
+	s.message.PassiveNodeInfo = *passiveNodeInfo
+}
+
+// GetPassiveNodeInfo returns the passive node info
+func (s *Stream) GetPassiveNodeInfo() *NodeInfo {
+	return &s.message.PassiveNodeInfo
+}
+
+// SetActiveNodeInfo sets the active node info
+func (s *Stream) SetActiveNodeInfo(activeNodeInfo *NodeInfo) {
+	s.message.ActiveNodeInfo = *activeNodeInfo
+}
+
+// GetActiveNodeInfo returns the active node info
+func (s *Stream) GetActiveNodeInfo() *NodeInfo {
+	return &s.message.ActiveNodeInfo
+}
+
+// SetIsDryRunFailover sets the is dry run failover
+func (s *Stream) SetIsDryRunFailover(isDryRunFailover bool) {
+	s.message.IsDryRunFailover = isDryRunFailover
+}
+
+// GetIsDryRunFailover returns the is dry run failover
+func (s Stream) GetIsDryRunFailover() bool {
+	return s.message.IsDryRunFailover
+}
+
+// SetIsSuccessfullyCompleted sets the is successfully completed
+func (s *Stream) SetIsSuccessfullyCompleted(isSuccessfullyCompleted bool) {
+	s.message.IsSuccessfullyCompleted = isSuccessfullyCompleted
+}
+
+// GetIsSuccessfullyCompleted returns the is successfully completed
+func (s Stream) GetIsSuccessfullyCompleted() bool {
+	return s.message.IsSuccessfullyCompleted
+}
+
+// SetFailoverStartSlot sets the failover start slot
+func (s *Stream) SetFailoverStartSlot(failoverStartSlot uint64) {
+	s.message.FailoverStartSlot = failoverStartSlot
+}
+
+// GetFailoverStartSlot returns the failover start slot
+func (s Stream) GetFailoverStartSlot() uint64 {
+	return s.message.FailoverStartSlot
+}
+
+// SetFailoverEndSlot sets the failover end slot
+func (s *Stream) SetFailoverEndSlot(failoverEndSlot uint64) {
+	s.message.FailoverEndSlot = failoverEndSlot
+}
+
+// GetFailoverEndSlot returns the failover end slot
+func (s Stream) GetFailoverEndSlot() uint64 {
+	return s.message.FailoverEndSlot
+}
+
+// ConfirmFailover is called by the passive node to proceed with the failover
+// it shows confirmation message and waits for user to confirm. once confirmed
+// it allows the stream to proceed and the active node begins setting identity
+// and tower file sync
+func (s *Stream) ConfirmFailover() (err error) {
+	// Add custom function to split commands
+	funcMap := template.FuncMap{
+		"splitCommand": func(cmd string) string {
+			// Split the command by spaces
+			parts := strings.Fields(cmd)
+			if len(parts) == 0 {
+				return ""
+			}
+			// Join with newlines and proper indentation
+			return parts[0] + " \\\n      " + strings.Join(parts[1:], " \\\n      ")
+		},
+	}
+
+	// Merge with existing style functions
+	maps.Copy(funcMap, style.TemplateFuncMap())
+
+	tpl := template.New("confirmFailoverTpl").Funcs(funcMap)
+	tpl, err = tpl.Parse(`version: {{ .AppVersion }}
+{{ .SummaryTable }}
+
+{{/* Clear warning when not a drill i.e not a dry run */}}
+{{- if .IsDryRun -}}
+{{ Blue "INFO: This is a dry run - no identities will be changed on either node" }}
+{{- else -}}
+{{ Warning "WARNING: This is a real failover - identities will be changed on both nodes" }}
+{{- end }}
+
+Failing over will:
+{{ if .IsDryRun }}
+1. Sync tower file from {{ Active .ActiveNodeInfo.Hostname false }} {{ Active "(them)" false }} to {{ Passive "(us)" false }} {{ Passive .PassiveNodeInfo.Hostname false }} at:
+
+    {{ .PassiveNodeInfo.TowerFile }}
+
+2. Exit
+{{ else }}
+1. Set {{ Active .ActiveNodeInfo.Hostname false }} {{ Active "(them)" false }} to {{ Passive "PASSIVE" false }} {{ Passive .ActiveNodeInfo.Identities.Passive.Pubkey false }} with command:
+
+    {{ .ActiveNodeInfo.SetIdentityCommand }}
+
+2. Sync tower file from {{ Active .ActiveNodeInfo.Hostname false }} {{ Active "(them)" false }} to {{ Passive "(us)" false }} {{ Passive .PassiveNodeInfo.Hostname false }} at:
+
+    {{ .PassiveNodeInfo.TowerFile }}
+
+3. Set {{ Passive .PassiveNodeInfo.Hostname false }} {{ Passive "(us)" false }} to {{ Active "ACTIVE" false }} {{ Active .PassiveNodeInfo.Identities.Active.Pubkey false }} with command:
+
+    {{ .PassiveNodeInfo.SetIdentityCommand }}
+
+4. Exit
+{{ end -}}
+`)
+
+	if err != nil {
+		return fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tpl.Execute(&buf, map[string]any{
+		"IsDryRun":        s.message.IsDryRunFailover,
+		"PassiveNodeInfo": s.message.PassiveNodeInfo,
+		"ActiveNodeInfo":  s.message.ActiveNodeInfo,
+		"SummaryTable":    s.message.currentStateTableString(),
+		"AppVersion":      pkgconstants.AppVersion,
+	}); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	// print confirm message
+	fmt.Println(style.RenderMessageString(buf.String()))
+
+	var confirmFailover bool
+	// ask to proceed
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Proceed with failover?").
+				Value(&confirmFailover),
+		),
+	)
+
+	err = form.Run()
+	if err != nil {
+		return fmt.Errorf("server cancelled failover: %w", err)
+	}
+
+	if !confirmFailover {
+		return fmt.Errorf("server cancelled failover")
+	}
+
+	return nil
+}
+
+// GetFailoverDuration returns the failover duration
+func (s *Stream) GetFailoverDuration() time.Duration {
+	return s.message.PassiveNodeSetIdentityEndTime.Sub(s.message.ActiveNodeSetIdentityStartTime)
+}
+
+// GetFailoverSlotsDuration returns the failover slots duration
+func (s *Stream) GetFailoverSlotsDuration() uint64 {
+	return s.GetFailoverEndSlot() - s.GetFailoverStartSlot()
+}
+
+// GetStateTable returns the state table
+func (s *Stream) GetStateTable() string {
+	return s.message.currentStateTableString()
+}
+
+// GetFailoverDurationTableString returns the failover duration table string
+func (s *Stream) GetFailoverDurationTableString() string {
+	stageColumnRows := formatStageColumnRows(
+		[]string{
+			style.RenderPassiveString(s.message.ActiveNodeInfo.Hostname, false),
+			style.RenderGreyString("--set-identity-->", false),
+			style.RenderPassiveString(s.message.ActiveNodeInfo.Identities.Passive.Pubkey(), false),
+		},
+		[]string{
+			style.RenderPassiveString(s.message.ActiveNodeInfo.Hostname, false),
+			style.RenderGreyString("---tower-file--->", false),
+			style.RenderActiveString(s.message.PassiveNodeInfo.Hostname, false),
+		},
+		[]string{
+			style.RenderActiveString(s.message.PassiveNodeInfo.Hostname, false),
+			style.RenderGreyString("--set-identity-->", false),
+			style.RenderActiveString(s.message.PassiveNodeInfo.Identities.Active.Pubkey(), false),
+		},
+	)
+	return style.RenderTable(
+		[]string{"Stage", "Duration", "Slot"},
+		[][]string{
+			{
+				stageColumnRows[0],
+				s.message.ActiveNodeSetIdentityEndTime.Sub(s.message.ActiveNodeSetIdentityStartTime).String(),
+				humanize.Comma(int64(s.GetFailoverStartSlot())),
+			},
+			{
+				stageColumnRows[1],
+				fmt.Sprintf("%s (%s)",
+					s.message.PassiveNodeSyncTowerFileEndTime.Sub(s.message.ActiveNodeSyncTowerFileStartTime).String(),
+					humanize.Bytes(uint64(len(s.message.ActiveNodeInfo.TowerFileBytes))),
+				),
+				" ",
+			},
+			{
+				stageColumnRows[2],
+				s.message.PassiveNodeSetIdentityEndTime.Sub(s.message.PassiveNodeSetIdentityStartTime).String(),
+				humanize.Comma(int64(s.GetFailoverEndSlot())),
+			},
+			{
+				style.RenderBoldMessage("Total"),
+				fmt.Sprintf("%s (wall clock)", style.RenderBoldMessage(s.GetFailoverDuration().String())),
+				style.RenderBoldMessage(fmt.Sprintf("%s slots", humanize.Comma(int64(s.GetFailoverSlotsDuration())))),
+			},
+		},
+		func(row, col int) lipgloss.Style {
+			if row == table.HeaderRow {
+				return style.TableHeaderStyle
+			}
+			// total stage title
+			if row == 3 && col == 0 {
+				return style.TableCellStyle.Align(lipgloss.Right)
+			}
+			return style.TableCellStyle.Align(lipgloss.Left)
+		},
+	)
+}
+
+// SetActiveNodeSetIdentityStartTime sets the active node set identity start time
+func (s *Stream) SetActiveNodeSetIdentityStartTime() {
+	s.message.ActiveNodeSetIdentityStartTime = time.Now()
+}
+
+// SetActiveNodeSetIdentityEndTime sets the active node set identity end time
+func (s *Stream) SetActiveNodeSetIdentityEndTime() {
+	s.message.ActiveNodeSetIdentityEndTime = time.Now()
+}
+
+// SetActiveNodeSyncTowerFileStartTime sets the active node sync tower file start time
+func (s *Stream) SetActiveNodeSyncTowerFileStartTime() {
+	s.message.ActiveNodeSyncTowerFileStartTime = time.Now()
+}
+
+// SetActiveNodeSyncTowerFileEndTime sets the active node sync tower file end time
+func (s *Stream) SetActiveNodeSyncTowerFileEndTime() {
+	s.message.ActiveNodeSyncTowerFileEndTime = time.Now()
+}
+
+// SetPassiveNodeSetIdentityStartTime sets the passive node set identity start time
+func (s *Stream) SetPassiveNodeSetIdentityStartTime() {
+	s.message.PassiveNodeSetIdentityStartTime = time.Now()
+}
+
+// SetPassiveNodeSetIdentityEndTime sets the passive node set identity end time
+func (s *Stream) SetPassiveNodeSetIdentityEndTime() {
+	s.message.PassiveNodeSetIdentityEndTime = time.Now()
+}
+
+// SetPassiveNodeSyncTowerFileEndTime sets the passive node sync tower file end time
+func (s *Stream) SetPassiveNodeSyncTowerFileEndTime() {
+	s.message.PassiveNodeSyncTowerFileEndTime = time.Now()
+}
+
+// PullActiveIdentityVoteCreditsSample pulls a sample of the vote credits for the active identity
+func (s *Stream) PullActiveIdentityVoteCreditsSample(solanaRPCClient solana.ClientInterface) (err error) {
+	identityPubkey := s.message.ActiveNodeInfo.Identities.Active.Key.PublicKey().String()
+
+	// fetch current state of vote account from its pubkey
+	voteAccount, creditRank, err := solanaRPCClient.GetCreditRankedVoteAccountFromPubkey(identityPubkey)
+	if err != nil {
+		return fmt.Errorf("failed to get vote accounts: %w", err)
+	}
+
+	// initialize the credit samples for the identity if it doesn't exist
+	if _, ok := s.message.CreditSamples[identityPubkey]; !ok {
+		s.message.CreditSamples[identityPubkey] = make([]CreditsSample, 0)
+	}
+
+	// take sample
+	sample := &CreditsSample{
+		Timestamp: time.Now(),
+		VoteRank:  creditRank,
+	}
+
+	// find compute credits
+	if len(voteAccount.EpochCredits) > 0 {
+		// Calculate credits as the difference between current and previous epoch credits
+		lastIndex := len(voteAccount.EpochCredits) - 1
+		currentCredits := voteAccount.EpochCredits[lastIndex][1]
+		previousCredits := int64(0)
+		if lastIndex > 0 {
+			previousCredits = voteAccount.EpochCredits[lastIndex-1][1]
+		}
+		sample.Credits = int(currentCredits - previousCredits)
+	}
+
+	// append sample to the identity's credit samples
+	s.message.CreditSamples[identityPubkey] = append(
+		s.message.CreditSamples[identityPubkey],
+		*sample,
+	)
+
+	return nil
+}
+
+// PullActiveIdentityVoteCreditsSamples pulls a sample of the vote credits for the active identity
+func (s *Stream) PullActiveIdentityVoteCreditsSamples(solanaRPCClient solana.ClientInterface, nSamples int) (err error) {
+	if nSamples == 0 {
+		return nil
+	}
+	if nSamples == 1 {
+		return s.PullActiveIdentityVoteCreditsSample(solanaRPCClient)
+	}
+
+	// multiple samples may take some time so show a spinner to keep you patient
+	var sp *spinner.Spinner
+	interval := 5 * time.Second
+	sp = spinner.New().Title(fmt.Sprintf("Pulling %d vote credit samples %s apart...", nSamples, interval))
+
+	sampleCount := 0
+	sp.ActionWithErr(func(ctx context.Context) error {
+		for range make([]struct{}, nSamples) {
+			sampleCount++
+			sp.Title(fmt.Sprintf("Pulling vote credit sample %d of %d...", sampleCount, nSamples))
+			err := s.PullActiveIdentityVoteCreditsSample(solanaRPCClient)
+			if err != nil {
+				sp.Title(fmt.Sprintf("Failed to pull vote credits sample: %s", err))
+				continue
+			}
+			sample := s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.Pubkey()][len(s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.Pubkey()])-1]
+			if len(s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.Pubkey()]) > 2 {
+				// check and warn if credits are not increasing between the last two samples
+				previousSample := s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.Pubkey()][len(s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.Pubkey()])-2]
+				if sample.Credits <= previousSample.Credits {
+					sp.Title(style.RenderWarningStringf(
+						"Vote credits are not increasing between samples %d and %d - this is not good",
+						sampleCount-1,
+						sampleCount,
+					))
+				}
+			}
+			time.Sleep(interval)
+			sp.Title(fmt.Sprintf("Pulled vote credit sample %d of %d - credits: %d, rank: %d...", sampleCount, nSamples, sample.Credits, sample.VoteRank))
+		}
+		log.Debug().Msgf("Pulled %d vote credit samples", sampleCount)
+		return nil
+	})
+	return sp.Run()
+}
+
+// GetVoteCreditRankDifference returns the difference in vote credit rank between the first and last sample
+func (s *Stream) GetVoteCreditRankDifference() (difference, first, last int, err error) {
+	pubkey := s.message.ActiveNodeInfo.Identities.Active.Pubkey()
+	samples := s.message.CreditSamples[pubkey]
+	if len(samples) < 2 {
+		return 0, 0, 0, fmt.Errorf("not enough vote credit samples to calculate difference")
+	}
+	first = samples[0].VoteRank
+	last = samples[len(samples)-1].VoteRank
+	difference = last - first
+	// invert the difference (lower number is better)
+	return -1 * difference, first, last, nil
+}
+
+// formatStageColumnRows formats the stage column rows
+// each row is a slice of strings representing 3 columns
+// that must be padded to all have the same length
+func formatStageColumnRows(rows ...[]string) (formattedRows []string) {
+	maxColumnLengths := []int{0, 0, 0}
+	formattedRows = make([]string, len(rows))
+
+	// get the longest string length of each column
+	for _, row := range rows {
+		// for each row get the longest string length of each column
+		if len(row[0]) > maxColumnLengths[0] {
+			maxColumnLengths[0] = len(row[0])
+		}
+		if len(row[1]) > maxColumnLengths[1] {
+			maxColumnLengths[1] = len(row[1])
+		}
+		if len(row[2]) > maxColumnLengths[2] {
+			maxColumnLengths[2] = len(row[2])
+		}
+	}
+
+	// pad each column to the longest string length
+	for rowIndex, row := range rows {
+		col1Value := row[0]
+		col2Value := row[1]
+		col3Value := row[2]
+		// // totals column just create first two colmns at max length
+		// if rowIndex == 3 {
+		// 	col1Value = strings.Repeat(" ", maxColumnLengths[0])
+		// 	col2Value = strings.Repeat(" ", maxColumnLengths[1])
+		// }
+
+		col1Style := lipgloss.NewStyle().PaddingRight(maxColumnLengths[0] - len(col1Value))
+		col2Style := lipgloss.NewStyle().PaddingRight(maxColumnLengths[1] - len(col2Value))
+		col3Style := lipgloss.NewStyle().PaddingRight(maxColumnLengths[2] - len(col3Value))
+
+		// if rowIndex == 3 {
+		// 	col3Style = col3Style.PaddingRight(0).PaddingLeft(maxColumnLengths[2] - len(col3Value))
+		// }
+
+		formattedRows[rowIndex] = fmt.Sprintf("%s %s %s",
+			col1Style.Render(col1Value),
+			col2Style.Render(col2Value),
+			col3Style.Render(col3Value),
+		)
+	}
+
+	return formattedRows
+}

@@ -1,0 +1,38 @@
+validator:
+  bin: ./scripts/agave-validator-mock.sh
+  cluster: mainnet-beta
+  public_ip: 177.54.159.7 # don't set IRL
+  hostname: validator-1
+  identities:
+    active: ./local-test/validator-1/active-identity.json
+    passive: ./local-test/validator-1/passive-identity.json
+  rpc_address: http://localhost:8899
+  ledger_dir: ./local-test/validator-1/ledger
+  tower:
+    dir: ./local-test/validator-1/tower
+    auto_empty_when_passive: true
+  failover:
+    peers:
+      validator-2:
+        address: localhost:9898
+    hooks:
+      pre:
+        when_passive:
+          - name: pre_hook_x_when_passive
+            command: ./scripts/hook-mock.sh
+            args: [ "arg1", "arg2"]
+            must_succeed: true
+        when_active:
+          - name: pre_hook_y_when_active
+            command: ./scripts/hook-mock.sh
+            args: [ "arg1", "arg2"]
+            must_succeed: true
+      post:
+        when_passive:
+          - name: post_hook_y_when_passive
+            command: ./scripts/hook-mock.sh
+            args: [ "arg1", "arg2"]
+        when_active:
+          - name: post_hook_z_when_active
+            command: ./scripts/hook-mock.sh
+            args: [ "arg1", "arg2"]
