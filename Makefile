@@ -29,7 +29,7 @@ hot-reload:
 	@air -c .air.conf
 
 test:
-	echo "${APP_VERSION}" >"pkg/constants/app.version"
+	echo -n "${APP_VERSION}" >"pkg/constants/app.version"
 	go test ./...
 
 build:

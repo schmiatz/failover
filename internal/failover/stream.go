@@ -179,6 +179,7 @@ func (s *Stream) ConfirmFailover() (err error) {
 
 	tpl := template.New("confirmFailoverTpl").Funcs(funcMap)
 	tpl, err = tpl.Parse(`{{ Purple "solana-validator-failover v" }}{{ Purple .AppVersion }}
+
 {{ .SummaryTable }}
 
 {{/* Clear warning when not a drill i.e not a dry run */}}

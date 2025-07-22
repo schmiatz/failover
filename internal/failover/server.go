@@ -191,21 +191,29 @@ func (s *Server) handleFailoverStream(stream quic.Stream) {
 		return
 	}
 
-	// ensure client and this server are using the same version of solana-validator-failover
-	clientVersion := s.failoverStream.GetActiveNodeInfo().SolanaValidatorFailoverVersion
-	serverVersion := pkgconstants.AppVersion
-	if clientVersion != serverVersion {
-		s.failoverStream.LogErrorWithSetMessagef("active node is running a different version of this program: %s (them) != %s (us)", clientVersion, serverVersion)
-		if s.failoverStream.Encode() != nil {
-			return
-		}
-	}
-
 	// set the is dry run failover flag
 	s.failoverStream.SetIsDryRunFailover(s.isDryRunFailover)
 
 	// set this node's info so subsequent responses can be sent to the client with it
 	s.failoverStream.SetPassiveNodeInfo(s.passiveNodeInfo)
+
+	// ensure client and this server are using the same version of solana-validator-failover
+	clientVersion := s.failoverStream.GetActiveNodeInfo().SolanaValidatorFailoverVersion
+	serverVersion := pkgconstants.AppVersion
+
+	s.logger.Debug().
+		Str("server_version", serverVersion).
+		Str("client_version", clientVersion).
+		Msg("checking for client and server version mismatch")
+
+	if clientVersion != serverVersion {
+		s.failoverStream.LogErrorWithSetMessagef("Server (%s) and client (%s) version mismatch", serverVersion, clientVersion)
+		if err := s.failoverStream.Encode(); err != nil {
+			s.logger.Error().Err(err).Msg("failed to send error message to client")
+		}
+		s.logger.Fatal().Msg("Server and client running different versions of this program - aborting")
+		return
+	}
 
 	// query gossip for client by its public IP
 	s.logger.Debug().Msgf("querying gossip for active node IP %s", s.failoverStream.GetActiveNodeInfo().PublicIP)
