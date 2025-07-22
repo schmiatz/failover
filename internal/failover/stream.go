@@ -178,38 +178,32 @@ func (s *Stream) ConfirmFailover() (err error) {
 	maps.Copy(funcMap, style.TemplateFuncMap())
 
 	tpl := template.New("confirmFailoverTpl").Funcs(funcMap)
-	tpl, err = tpl.Parse(`version: {{ .AppVersion }}
+	tpl, err = tpl.Parse(`{{ Purple "solana-validator-failover v" }}{{ Purple .AppVersion }}
 {{ .SummaryTable }}
 
 {{/* Clear warning when not a drill i.e not a dry run */}}
 {{- if .IsDryRun -}}
 {{ Blue "INFO: This is a dry run - no identities will be changed on either node" }}
+{{ Blue "INFO: To run a real failover, re-run with --not-a-drill" }}
 {{- else -}}
 {{ Warning "WARNING: This is a real failover - identities will be changed on both nodes" }}
 {{- end }}
 
 Failing over will:
-{{ if .IsDryRun }}
-1. Sync tower file from {{ Active .ActiveNodeInfo.Hostname false }} {{ Active "(them)" false }} to {{ Passive "(us)" false }} {{ Passive .PassiveNodeInfo.Hostname false }} at:
 
-    {{ .PassiveNodeInfo.TowerFile }}
+1. {{ if .IsDryRun }}{{ Blue "(dry-run)" }} {{ end }}Set {{ Active "(them)" false }} {{ Active .ActiveNodeInfo.Hostname false }} to {{ Passive "PASSIVE" false }} {{ Passive .ActiveNodeInfo.Identities.Passive.Pubkey false }} with command:
 
-2. Exit
-{{ else }}
-1. Set {{ Active .ActiveNodeInfo.Hostname false }} {{ Active "(them)" false }} to {{ Passive "PASSIVE" false }} {{ Passive .ActiveNodeInfo.Identities.Passive.Pubkey false }} with command:
+    {{ LightGrey .ActiveNodeInfo.SetIdentityCommand }}
 
-    {{ .ActiveNodeInfo.SetIdentityCommand }}
+2. Sync tower file from {{ Active "(them)" false }} {{ Active .ActiveNodeInfo.Hostname false }} to {{ Passive "(us)" false }} {{ Passive .PassiveNodeInfo.Hostname false }} at:
 
-2. Sync tower file from {{ Active .ActiveNodeInfo.Hostname false }} {{ Active "(them)" false }} to {{ Passive "(us)" false }} {{ Passive .PassiveNodeInfo.Hostname false }} at:
+    {{ LightGrey .PassiveNodeInfo.TowerFile }}
 
-    {{ .PassiveNodeInfo.TowerFile }}
+3. {{ if .IsDryRun }}{{ Blue "(dry-run)" }} {{ end }}Set {{ Passive "(us)" false }} {{ Passive .PassiveNodeInfo.Hostname false }} to {{ Active "ACTIVE" false }} {{ Active .PassiveNodeInfo.Identities.Active.Pubkey false }} with command:
 
-3. Set {{ Passive .PassiveNodeInfo.Hostname false }} {{ Passive "(us)" false }} to {{ Active "ACTIVE" false }} {{ Active .PassiveNodeInfo.Identities.Active.Pubkey false }} with command:
-
-    {{ .PassiveNodeInfo.SetIdentityCommand }}
+    {{ LightGrey .PassiveNodeInfo.SetIdentityCommand }}
 
 4. Exit
-{{ end -}}
 `)
 
 	if err != nil {
