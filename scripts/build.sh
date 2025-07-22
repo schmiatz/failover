@@ -68,7 +68,7 @@ main() {
     
     # Write version file early so it's available for linting and testing
     log_info "writing version ${APP_VERSION} -> pkg/constants/app.version"
-    echo "${APP_VERSION}" >"pkg/constants/app.version"
+    echo -n "${APP_VERSION}" >"pkg/constants/app.version"
     
     go_tidy
     go_lint
