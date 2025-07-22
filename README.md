@@ -1,5 +1,7 @@
 # solana-validator-failover
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Simple p2p Solana validator failovers
 
 ![solanna-validator-failover-passive-to-active-png](vhs/failover-passive-to-active.png)
