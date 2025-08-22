@@ -165,6 +165,12 @@ func (v *Validator) NewFromConfig(cfg *Config) error {
 		return err
 	}
 
+	// get server
+	err = v.configureServer(cfg.Failover.Server)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -498,6 +504,15 @@ func (v *Validator) configureHostname(hostname string) (err error) {
 	v.logger.Debug().
 		Str("hostname", v.Hostname).
 		Msg("hostname set")
+	return nil
+}
+
+// configureServer ensures the server is valid and sets it
+func (v *Validator) configureServer(cfg ServerConfig) (err error) {
+	v.FailoverServerConfig = cfg
+	v.logger.Debug().
+		Int("port", v.FailoverServerConfig.Port).
+		Msg("server set")
 	return nil
 }
 
