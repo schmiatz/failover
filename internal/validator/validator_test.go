@@ -61,7 +61,7 @@ func (tv *TestValidator) configureGossipNode() (err error) {
 	}
 	tv.logger.Debug().
 		Str("public_ip", tv.GossipNode.IP()).
-		Str("pubkey", tv.GossipNode.Pubkey()).
+		Str("pubkey", tv.GossipNode.PubKey()).
 		Msg("gossip node set")
 	return nil
 }
@@ -554,7 +554,7 @@ func TestNewFromConfig_Success(t *testing.T) {
 		},
 		Tower: TowerConfig{
 			Dir:                  towerDir,
-			FileNameTemplate:     "tower-{{ .Identities.Active.Pubkey }}.bin",
+			FileNameTemplate:     "tower-{{ .Identities.Active.PubKey }}.bin",
 			AutoEmptyWhenPassive: true,
 		},
 		Failover: FailoverConfig{

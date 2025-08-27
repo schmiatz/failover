@@ -42,14 +42,14 @@ func (m *Message) currentStateTableString() string {
 			"active",
 			activeNodeInfo.Hostname,
 			activeNodeInfo.PublicIP,
-			activeNodeInfo.Identities.Active.Pubkey(),
+			activeNodeInfo.Identities.Active.PubKey(),
 			activeNodeInfo.ClientVersion,
 		},
 		{
 			"passive",
 			passiveNodeInfo.Hostname,
 			passiveNodeInfo.PublicIP,
-			passiveNodeInfo.Identities.Passive.Pubkey(),
+			passiveNodeInfo.Identities.Passive.PubKey(),
 			passiveNodeInfo.ClientVersion,
 		},
 	}

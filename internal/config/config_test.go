@@ -36,7 +36,7 @@ validator:
       peer2:
         address: localhost:8002
   tower:
-    file_name_template: "tower-test-{{ .Identities.Active.Pubkey }}.bin"
+    file_name_template: "tower-test-{{ .Identities.Active.PubKey }}.bin"
   identities:
     active: /path/to/active/key.json
     passive: /path/to/passive/key.json
@@ -60,7 +60,7 @@ validator:
 	assert.Equal(t, "10s", cfg.Validator.Failover.MinimumTimeToLeaderSlot)
 	assert.Equal(t, 10, cfg.Validator.Failover.Monitor.CreditSamples.Count)
 	assert.Equal(t, "10s", cfg.Validator.Failover.Monitor.CreditSamples.Interval)
-	assert.Equal(t, "tower-test-{{ .Identities.Active.Pubkey }}.bin", cfg.Validator.Tower.FileNameTemplate)
+	assert.Equal(t, "tower-test-{{ .Identities.Active.PubKey }}.bin", cfg.Validator.Tower.FileNameTemplate)
 	assert.Equal(t, "/path/to/active/key.json", cfg.Validator.Identities.Active)
 	assert.Equal(t, "/path/to/passive/key.json", cfg.Validator.Identities.Passive)
 
@@ -194,7 +194,7 @@ validator:
       peer3:
         address: peer3.private.net:9898
   tower:
-    file_name_template: "custom-tower-{{ .Identities.Active.Pubkey }}-{{ .Cluster }}.bin"
+    file_name_template: "custom-tower-{{ .Identities.Active.PubKey }}-{{ .Cluster }}.bin"
   identities:
     active: /keys/active.json
     passive: /keys/passive.json
@@ -231,7 +231,7 @@ validator:
 
 	// Verify tower configuration
 	assert.Equal(t,
-		"custom-tower-{{ .Identities.Active.Pubkey }}-{{ .Cluster }}.bin",
+		"custom-tower-{{ .Identities.Active.PubKey }}-{{ .Cluster }}.bin",
 		cfg.Validator.Tower.FileNameTemplate,
 	)
 

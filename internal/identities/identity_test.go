@@ -36,7 +36,7 @@ func TestNewIdentityFromFile_Success(t *testing.T) {
 	require.NotNil(t, identity)
 	assert.Equal(t, keyFile, identity.KeyFile)
 	assert.Equal(t, privateKey.String(), identity.Key.String())
-	assert.Equal(t, privateKey.PublicKey().String(), identity.Pubkey())
+	assert.Equal(t, privateKey.PublicKey().String(), identity.PubKey())
 }
 
 func TestNewIdentityFromFile_WithTildePath(t *testing.T) {
@@ -72,7 +72,7 @@ func TestNewIdentityFromFile_WithTildePath(t *testing.T) {
 	require.NotNil(t, identity)
 	assert.Equal(t, keyFile, identity.KeyFile)
 	assert.Equal(t, privateKey.String(), identity.Key.String())
-	assert.Equal(t, privateKey.PublicKey().String(), identity.Pubkey())
+	assert.Equal(t, privateKey.PublicKey().String(), identity.PubKey())
 }
 
 func TestNewIdentityFromFile_RelativePath(t *testing.T) {
@@ -109,7 +109,7 @@ func TestNewIdentityFromFile_RelativePath(t *testing.T) {
 	require.NotNil(t, identity)
 	assert.Equal(t, keyFile, identity.KeyFile)
 	assert.Equal(t, privateKey.String(), identity.Key.String())
-	assert.Equal(t, privateKey.PublicKey().String(), identity.Pubkey())
+	assert.Equal(t, privateKey.PublicKey().String(), identity.PubKey())
 }
 
 func TestNewIdentityFromFile_FileNotFound(t *testing.T) {
@@ -228,7 +228,7 @@ func TestIdentity_Pubkey(t *testing.T) {
 	}
 
 	// Test Pubkey method
-	pubkey := identity.Pubkey()
+	pubkey := identity.PubKey()
 
 	// Assertions
 	assert.Equal(t, privateKey.PublicKey().String(), pubkey)
@@ -244,14 +244,32 @@ func TestIdentity_Pubkey_Consistency(t *testing.T) {
 	}
 
 	// Test that Pubkey returns the same value multiple times
-	pubkey1 := identity.Pubkey()
-	pubkey2 := identity.Pubkey()
-	pubkey3 := identity.Pubkey()
+	pubkey1 := identity.PubKey()
+	pubkey2 := identity.PubKey()
+	pubkey3 := identity.PubKey()
 
 	// Assertions
 	assert.Equal(t, pubkey1, pubkey2)
 	assert.Equal(t, pubkey2, pubkey3)
 	assert.Equal(t, privateKey.PublicKey().String(), pubkey1)
+}
+
+func TestIdentity_Pubkey_DeprecatedMethod(t *testing.T) {
+	// Create a test identity
+	privateKey := solana.NewWallet().PrivateKey
+	identity := &Identity{
+		KeyFile: "/path/to/key.json",
+		Key:     privateKey,
+	}
+
+	// Test that Pubkey() (deprecated) returns the same result as PubKey()
+	pubkeyDeprecated := identity.Pubkey()
+	pubkeyCorrect := identity.PubKey()
+
+	// Assertions
+	assert.Equal(t, pubkeyCorrect, pubkeyDeprecated)
+	assert.Equal(t, privateKey.PublicKey().String(), pubkeyDeprecated)
+	assert.Equal(t, privateKey.PublicKey().String(), pubkeyCorrect)
 }
 
 func TestNewIdentityFromFile_WithBase58Key(t *testing.T) {
@@ -279,7 +297,7 @@ func TestNewIdentityFromFile_WithBase58Key(t *testing.T) {
 	require.NotNil(t, identity)
 	assert.Equal(t, keyFile, identity.KeyFile)
 	assert.Equal(t, privateKey.String(), identity.Key.String())
-	assert.Equal(t, privateKey.PublicKey().String(), identity.Pubkey())
+	assert.Equal(t, privateKey.PublicKey().String(), identity.PubKey()) //nolint:staticcheck
 }
 
 func TestNewIdentityFromFile_WithWhitespace(t *testing.T) {
@@ -307,7 +325,7 @@ func TestNewIdentityFromFile_WithWhitespace(t *testing.T) {
 	require.NotNil(t, identity)
 	assert.Equal(t, keyFile, identity.KeyFile)
 	assert.Equal(t, privateKey.String(), identity.Key.String())
-	assert.Equal(t, privateKey.PublicKey().String(), identity.Pubkey())
+	assert.Equal(t, privateKey.PublicKey().String(), identity.PubKey())
 }
 
 // Benchmark tests
@@ -344,6 +362,6 @@ func BenchmarkIdentity_Pubkey(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = identity.Pubkey()
+		_ = identity.PubKey()
 	}
 }

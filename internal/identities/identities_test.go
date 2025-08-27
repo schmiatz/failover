@@ -55,8 +55,8 @@ func TestNewFromConfig_Success(t *testing.T) {
 	assert.Equal(t, passiveKeyFile, identities.Passive.KeyFile)
 	assert.Equal(t, activeKey.String(), identities.Active.Key.String())
 	assert.Equal(t, passiveKey.String(), identities.Passive.Key.String())
-	assert.Equal(t, activeKey.PublicKey().String(), identities.Active.Pubkey())
-	assert.Equal(t, passiveKey.PublicKey().String(), identities.Passive.Pubkey())
+	assert.Equal(t, activeKey.PublicKey().String(), identities.Active.PubKey())
+	assert.Equal(t, passiveKey.PublicKey().String(), identities.Passive.PubKey())
 }
 
 func TestNewFromConfig_ActiveFileNotFound(t *testing.T) {

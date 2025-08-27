@@ -102,7 +102,7 @@ func TestGossipClient_NodeFromIP_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, node)
 	assert.Equal(t, "192.168.1.100", node.IP())
-	assert.Equal(t, "11111111111111111111111111111111", node.Pubkey())
+	assert.Equal(t, "11111111111111111111111111111111", node.PubKey())
 	assert.Equal(t, "1.16.0", node.Version())
 
 	networkMock.AssertExpectations(t)
@@ -209,7 +209,7 @@ func TestGossipClient_NodeFromPubkey_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, node)
 	assert.Equal(t, "192.168.1.100", node.IP())
-	assert.Equal(t, "11111111111111111111111111111111", node.Pubkey())
+	assert.Equal(t, "11111111111111111111111111111111", node.PubKey())
 	assert.Equal(t, "1.16.0", node.Version())
 
 	networkMock.AssertExpectations(t)
@@ -294,7 +294,7 @@ func TestNode_Pubkey(t *testing.T) {
 	}
 
 	// Test pubkey extraction
-	assert.Equal(t, "11111111111111111111111111111111", node.Pubkey())
+	assert.Equal(t, "11111111111111111111111111111111", node.PubKey())
 }
 
 func TestNode_Version(t *testing.T) {
