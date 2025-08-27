@@ -182,7 +182,7 @@ func (c *Client) Start() {
 		Msgf("👉%sSetting identity to %s - %s",
 			dryRunPrefix,
 			style.RenderPassiveString(strings.ToUpper(constants.NodeRolePassive), false),
-			style.RenderPassiveString(c.failoverStream.GetActiveNodeInfo().Identities.Passive.Pubkey(), false),
+			style.RenderPassiveString(c.failoverStream.GetActiveNodeInfo().Identities.Passive.PubKey(), false),
 		)
 
 	c.failoverStream.SetActiveNodeSetIdentityStartTime()
@@ -344,17 +344,17 @@ func (c *Client) getHookEnvMap(params hookEnvMapParams) (envMap map[string]strin
 	// this node is active
 	envMap["THIS_NODE_NAME"] = c.activeNodeInfo.Hostname
 	envMap["THIS_NODE_PUBLIC_IP"] = c.activeNodeInfo.PublicIP
-	envMap["THIS_NODE_ACTIVE_IDENTITY_PUBKEY"] = c.activeNodeInfo.Identities.Active.Pubkey()
+	envMap["THIS_NODE_ACTIVE_IDENTITY_PUBKEY"] = c.activeNodeInfo.Identities.Active.PubKey()
 	envMap["THIS_NODE_ACTIVE_IDENTITY_KEYPAIR_FILE"] = c.activeNodeInfo.Identities.Active.KeyFile
-	envMap["THIS_NODE_PASSIVE_IDENTITY_PUBKEY"] = c.activeNodeInfo.Identities.Passive.Pubkey()
+	envMap["THIS_NODE_PASSIVE_IDENTITY_PUBKEY"] = c.activeNodeInfo.Identities.Passive.PubKey()
 	envMap["THIS_NODE_PASSIVE_IDENTITY_KEYPAIR_FILE"] = c.activeNodeInfo.Identities.Passive.KeyFile
 	envMap["THIS_NODE_CLIENT_VERSION"] = c.activeNodeInfo.ClientVersion
 
 	// peer node
 	envMap["PEER_NODE_NAME"] = c.failoverStream.GetPassiveNodeInfo().Hostname
 	envMap["PEER_NODE_PUBLIC_IP"] = c.failoverStream.GetPassiveNodeInfo().PublicIP
-	envMap["PEER_NODE_ACTIVE_IDENTITY_PUBKEY"] = c.failoverStream.GetPassiveNodeInfo().Identities.Active.Pubkey()
-	envMap["PEER_NODE_PASSIVE_IDENTITY_PUBKEY"] = c.failoverStream.GetPassiveNodeInfo().Identities.Passive.Pubkey()
+	envMap["PEER_NODE_ACTIVE_IDENTITY_PUBKEY"] = c.failoverStream.GetPassiveNodeInfo().Identities.Active.PubKey()
+	envMap["PEER_NODE_PASSIVE_IDENTITY_PUBKEY"] = c.failoverStream.GetPassiveNodeInfo().Identities.Passive.PubKey()
 	envMap["PEER_NODE_CLIENT_VERSION"] = c.failoverStream.GetPassiveNodeInfo().ClientVersion
 
 	return envMap

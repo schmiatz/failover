@@ -364,7 +364,7 @@ func (s *Server) handleFailoverStream(stream quic.Stream) {
 		Msgf("👉%sSetting identity to %s - %s",
 			dryRunPrefix,
 			style.RenderActiveString(strings.ToUpper(constants.NodeRoleActive), false),
-			style.RenderActiveString(s.failoverStream.GetPassiveNodeInfo().Identities.Active.Pubkey(), false),
+			style.RenderActiveString(s.failoverStream.GetPassiveNodeInfo().Identities.Active.PubKey(), false),
 		)
 
 	s.failoverStream.SetPassiveNodeSetIdentityStartTime()
@@ -493,8 +493,8 @@ func (s *Server) confirmGossipNodesPostFailover() {
 			}
 
 			// check the gossip pubkeys switched
-			isActiveNodeKeySwitchReflectedInGossip = solanaActiveNode.Pubkey() == s.failoverStream.GetPassiveNodeInfo().Identities.Active.Pubkey()
-			isPassiveNodeKeySwitchReflectedInGossip = solanaPassiveNode.Pubkey() == s.failoverStream.GetActiveNodeInfo().Identities.Passive.Pubkey()
+			isActiveNodeKeySwitchReflectedInGossip = solanaActiveNode.PubKey() == s.failoverStream.GetPassiveNodeInfo().Identities.Active.PubKey()
+			isPassiveNodeKeySwitchReflectedInGossip = solanaPassiveNode.PubKey() == s.failoverStream.GetActiveNodeInfo().Identities.Passive.PubKey()
 
 			// if the active node key is not reflected in gossip, query gossip again
 			if !isActiveNodeKeySwitchReflectedInGossip && hasRetriesLeft {
@@ -502,8 +502,8 @@ func (s *Server) confirmGossipNodesPostFailover() {
 					retryCount,
 					maxRetries,
 					solanaActiveNode.IP(),
-					solanaActiveNode.Pubkey(),
-					s.failoverStream.GetPassiveNodeInfo().Identities.Active.Pubkey(),
+					solanaActiveNode.PubKey(),
+					s.failoverStream.GetPassiveNodeInfo().Identities.Active.PubKey(),
 					retryDelay,
 				))
 				time.Sleep(retryDelay)
@@ -514,14 +514,14 @@ func (s *Server) confirmGossipNodesPostFailover() {
 			if !isActiveNodeKeySwitchReflectedInGossip && !hasRetriesLeft {
 				sp.Title(style.RenderErrorStringf("gossip active node %s pubkey does not match expected pubkey: %s != %s - after %d retries",
 					solanaActiveNode.IP(),
-					solanaActiveNode.Pubkey(),
-					s.failoverStream.GetPassiveNodeInfo().Identities.Active.Pubkey(),
+					solanaActiveNode.PubKey(),
+					s.failoverStream.GetPassiveNodeInfo().Identities.Active.PubKey(),
 					retryCount,
 				))
 				return fmt.Errorf("gossip active node %s pubkey does not match expected pubkey: %s != %s - after %d retries",
 					solanaActiveNode.IP(),
-					solanaActiveNode.Pubkey(),
-					s.failoverStream.GetPassiveNodeInfo().Identities.Active.Pubkey(),
+					solanaActiveNode.PubKey(),
+					s.failoverStream.GetPassiveNodeInfo().Identities.Active.PubKey(),
 					retryCount,
 				)
 			}
@@ -532,8 +532,8 @@ func (s *Server) confirmGossipNodesPostFailover() {
 					retryCount,
 					maxRetries,
 					solanaPassiveNode.IP(),
-					solanaPassiveNode.Pubkey(),
-					s.failoverStream.GetActiveNodeInfo().Identities.Passive.Pubkey(),
+					solanaPassiveNode.PubKey(),
+					s.failoverStream.GetActiveNodeInfo().Identities.Passive.PubKey(),
 					retryDelay,
 				))
 				time.Sleep(retryDelay)
@@ -544,14 +544,14 @@ func (s *Server) confirmGossipNodesPostFailover() {
 			if !isPassiveNodeKeySwitchReflectedInGossip && !hasRetriesLeft {
 				sp.Title(style.RenderErrorStringf("gossip passive node %s pubkey does not match expected pubkey: %s != %s - after %d retries",
 					solanaPassiveNode.IP(),
-					solanaPassiveNode.Pubkey(),
-					s.failoverStream.GetActiveNodeInfo().Identities.Passive.Pubkey(),
+					solanaPassiveNode.PubKey(),
+					s.failoverStream.GetActiveNodeInfo().Identities.Passive.PubKey(),
 					retryCount,
 				))
 				return fmt.Errorf("gossip passive node %s pubkey does not match expected pubkey: %s != %s - after %d retries",
 					solanaPassiveNode.IP(),
-					solanaPassiveNode.Pubkey(),
-					s.failoverStream.GetActiveNodeInfo().Identities.Passive.Pubkey(),
+					solanaPassiveNode.PubKey(),
+					s.failoverStream.GetActiveNodeInfo().Identities.Passive.PubKey(),
 					retryCount,
 				)
 			}
@@ -593,17 +593,17 @@ func (s *Server) getHookEnvMap(params hookEnvMapParams) (envMap map[string]strin
 	// this node is passive
 	envMap["THIS_NODE_NAME"] = s.passiveNodeInfo.Hostname
 	envMap["THIS_NODE_PUBLIC_IP"] = s.passiveNodeInfo.PublicIP
-	envMap["THIS_NODE_ACTIVE_IDENTITY_PUBKEY"] = s.passiveNodeInfo.Identities.Active.Pubkey()
+	envMap["THIS_NODE_ACTIVE_IDENTITY_PUBKEY"] = s.passiveNodeInfo.Identities.Active.PubKey()
 	envMap["THIS_NODE_ACTIVE_IDENTITY_KEYPAIR_FILE"] = s.passiveNodeInfo.Identities.Active.KeyFile
-	envMap["THIS_NODE_PASSIVE_IDENTITY_PUBKEY"] = s.passiveNodeInfo.Identities.Passive.Pubkey()
+	envMap["THIS_NODE_PASSIVE_IDENTITY_PUBKEY"] = s.passiveNodeInfo.Identities.Passive.PubKey()
 	envMap["THIS_NODE_PASSIVE_IDENTITY_KEYPAIR_FILE"] = s.passiveNodeInfo.Identities.Passive.KeyFile
 	envMap["THIS_NODE_CLIENT_VERSION"] = s.passiveNodeInfo.ClientVersion
 
 	// peer node is active
 	envMap["PEER_NODE_NAME"] = s.failoverStream.GetActiveNodeInfo().Hostname
 	envMap["PEER_NODE_PUBLIC_IP"] = s.failoverStream.GetActiveNodeInfo().PublicIP
-	envMap["PEER_NODE_ACTIVE_IDENTITY_PUBKEY"] = s.failoverStream.GetActiveNodeInfo().Identities.Active.Pubkey()
-	envMap["PEER_NODE_PASSIVE_IDENTITY_PUBKEY"] = s.failoverStream.GetActiveNodeInfo().Identities.Passive.Pubkey()
+	envMap["PEER_NODE_ACTIVE_IDENTITY_PUBKEY"] = s.failoverStream.GetActiveNodeInfo().Identities.Active.PubKey()
+	envMap["PEER_NODE_PASSIVE_IDENTITY_PUBKEY"] = s.failoverStream.GetActiveNodeInfo().Identities.Passive.PubKey()
 	envMap["PEER_NODE_CLIENT_VERSION"] = s.failoverStream.GetActiveNodeInfo().ClientVersion
 
 	return

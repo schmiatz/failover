@@ -192,7 +192,7 @@ func (s *Stream) ConfirmFailover() (err error) {
 
 Failing over will:
 
-1. {{ if .IsDryRun }}{{ Blue "(dry-run)" }} {{ end }}Set {{ Active "(them)" false }} {{ Active .ActiveNodeInfo.Hostname false }} to {{ Passive "PASSIVE" false }} {{ Passive .ActiveNodeInfo.Identities.Passive.Pubkey false }} with command:
+1. {{ if .IsDryRun }}{{ Blue "(dry-run)" }} {{ end }}Set {{ Active "(them)" false }} {{ Active .ActiveNodeInfo.Hostname false }} to {{ Passive "PASSIVE" false }} {{ Passive .ActiveNodeInfo.Identities.Passive.PubKey false }} with command:
 
     {{ LightGrey .ActiveNodeInfo.SetIdentityCommand }}
 
@@ -200,7 +200,7 @@ Failing over will:
 
     {{ LightGrey .PassiveNodeInfo.TowerFile }}
 
-3. {{ if .IsDryRun }}{{ Blue "(dry-run)" }} {{ end }}Set {{ Passive "(us)" false }} {{ Passive .PassiveNodeInfo.Hostname false }} to {{ Active "ACTIVE" false }} {{ Active .PassiveNodeInfo.Identities.Active.Pubkey false }} with command:
+3. {{ if .IsDryRun }}{{ Blue "(dry-run)" }} {{ end }}Set {{ Passive "(us)" false }} {{ Passive .PassiveNodeInfo.Hostname false }} to {{ Active "ACTIVE" false }} {{ Active .PassiveNodeInfo.Identities.Active.PubKey false }} with command:
 
     {{ LightGrey .PassiveNodeInfo.SetIdentityCommand }}
 
@@ -268,7 +268,7 @@ func (s *Stream) GetFailoverDurationTableString() string {
 		[]string{
 			style.RenderPassiveString(s.message.ActiveNodeInfo.Hostname, false),
 			style.RenderGreyString("--set-identity-->", false),
-			style.RenderPassiveString(s.message.ActiveNodeInfo.Identities.Passive.Pubkey(), false),
+			style.RenderPassiveString(s.message.ActiveNodeInfo.Identities.Passive.PubKey(), false),
 		},
 		[]string{
 			style.RenderPassiveString(s.message.ActiveNodeInfo.Hostname, false),
@@ -278,7 +278,7 @@ func (s *Stream) GetFailoverDurationTableString() string {
 		[]string{
 			style.RenderActiveString(s.message.PassiveNodeInfo.Hostname, false),
 			style.RenderGreyString("--set-identity-->", false),
-			style.RenderActiveString(s.message.PassiveNodeInfo.Identities.Active.Pubkey(), false),
+			style.RenderActiveString(s.message.PassiveNodeInfo.Identities.Active.PubKey(), false),
 		},
 	)
 	return style.RenderTable(
@@ -422,10 +422,10 @@ func (s *Stream) PullActiveIdentityVoteCreditsSamples(solanaRPCClient solana.Cli
 				sp.Title(fmt.Sprintf("Failed to pull vote credits sample: %s", err))
 				continue
 			}
-			sample := s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.Pubkey()][len(s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.Pubkey()])-1]
-			if len(s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.Pubkey()]) > 2 {
+			sample := s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.PubKey()][len(s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.PubKey()])-1]
+			if len(s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.PubKey()]) > 2 {
 				// check and warn if credits are not increasing between the last two samples
-				previousSample := s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.Pubkey()][len(s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.Pubkey()])-2]
+				previousSample := s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.PubKey()][len(s.message.CreditSamples[s.message.ActiveNodeInfo.Identities.Active.PubKey()])-2]
 				if sample.Credits <= previousSample.Credits {
 					sp.Title(style.RenderWarningStringf(
 						"Vote credits are not increasing between samples %d and %d - this is not good",
@@ -445,7 +445,7 @@ func (s *Stream) PullActiveIdentityVoteCreditsSamples(solanaRPCClient solana.Cli
 
 // GetVoteCreditRankDifference returns the difference in vote credit rank between the first and last sample
 func (s *Stream) GetVoteCreditRankDifference() (difference, first, last int, err error) {
-	pubkey := s.message.ActiveNodeInfo.Identities.Active.Pubkey()
+	pubkey := s.message.ActiveNodeInfo.Identities.Active.PubKey()
 	samples := s.message.CreditSamples[pubkey]
 	if len(samples) < 2 {
 		return 0, 0, 0, fmt.Errorf("not enough vote credit samples to calculate difference")

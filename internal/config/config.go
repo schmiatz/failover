@@ -37,7 +37,7 @@ const (
 	DefaultFailoverMonitorCreditSamplesInterval = "5s"
 
 	// DefaultTowerFileNameTemplate is the default tower file name template for the validator
-	DefaultTowerFileNameTemplate = "tower-1_9-{{ .Identities.Active.Pubkey }}.bin"
+	DefaultTowerFileNameTemplate = "tower-1_9-{{ .Identities.Active.PubKey }}.bin"
 
 	// DefaultSetIdentityPassiveCmdTemplate is the default set identity passive command template for the validator
 	DefaultSetIdentityPassiveCmdTemplate = "{{ .Bin }} --ledger {{ .LedgerDir }} set-identity {{ .Identities.Passive.KeyFile }}"

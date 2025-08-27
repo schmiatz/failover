@@ -176,12 +176,12 @@ func (v *Validator) NewFromConfig(cfg *Config) error {
 
 // IsActive returns true if the validator is active
 func (v *Validator) IsActive() bool {
-	return v.GossipNode.Pubkey() == v.Identities.Active.Pubkey()
+	return v.GossipNode.PubKey() == v.Identities.Active.PubKey()
 }
 
 // IsPassive returns true if the validator is passive
 func (v *Validator) IsPassive() bool {
-	return v.GossipNode.Pubkey() == v.Identities.Passive.Pubkey()
+	return v.GossipNode.PubKey() == v.Identities.Passive.PubKey()
 }
 
 // Failover runs the failover process
@@ -275,9 +275,9 @@ func (v *Validator) configureIdentities(identitiesConfig identities.Config) (err
 	}
 
 	v.logger.Debug().
-		Str("active_pubkey", v.Identities.Active.Pubkey()).
+		Str("active_pubkey", v.Identities.Active.PubKey()).
 		Str("active_keyfile", v.Identities.Active.KeyFile).
-		Str("passive_pubkey", v.Identities.Passive.Pubkey()).
+		Str("passive_pubkey", v.Identities.Passive.PubKey()).
 		Str("passive_keyfile", v.Identities.Passive.KeyFile).
 		Msg("identities set")
 
@@ -524,7 +524,7 @@ func (v *Validator) configureGossipNode() (err error) {
 	}
 	v.logger.Debug().
 		Str("public_ip", v.GossipNode.IP()).
-		Str("pubkey", v.GossipNode.Pubkey()).
+		Str("pubkey", v.GossipNode.PubKey()).
 		Msg("gossip node set")
 	return nil
 }
@@ -539,15 +539,15 @@ func (v *Validator) makeActive(params FailoverParams) (err error) {
 
 	log.Info().
 		Str("public_ip", v.PublicIP).
-		Str("pubkey", v.Identities.Passive.Pubkey()).
+		Str("pubkey", v.Identities.Passive.PubKey()).
 		Msgf("This validator is currently %s", style.RenderPassiveString(strings.ToUpper(constants.NodeRolePassive), false))
 
 	// check gossip for active peer and ensure its pubkey is the same as what this node would set itself to
-	_, err = v.solanaRPCClient.NodeFromPubkey(v.Identities.Active.Pubkey())
+	_, err = v.solanaRPCClient.NodeFromPubkey(v.Identities.Active.PubKey())
 	if err != nil {
 		return fmt.Errorf(
 			"active peer not found in gossip with pubkey %s from file %s: %w",
-			v.Identities.Active.Pubkey(),
+			v.Identities.Active.PubKey(),
 			v.Identities.Active.KeyFile,
 			err,
 		)
@@ -607,7 +607,7 @@ func (v *Validator) makePassive(params FailoverParams) (err error) {
 
 	log.Info().
 		Str("public_ip", v.PublicIP).
-		Str("pubkey", v.Identities.Active.Pubkey()).
+		Str("pubkey", v.Identities.Active.PubKey()).
 		Msgf("This validator is currently %s", style.RenderActiveString(strings.ToUpper(constants.NodeRoleActive), false))
 
 	log.Debug().Msg("failover active to passive")
