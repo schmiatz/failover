@@ -688,6 +688,18 @@ func (v *Validator) waitUntilHealthy() (err error) {
 
 // selectPassivePeer allows selection of a peer from the list of peers
 func (v *Validator) selectPassivePeer() (selectedPeer Peer, err error) {
+	// If there's only one peer, automatically select it
+	if len(v.Peers) == 1 {
+		for name, peer := range v.Peers {
+			log.Info().
+				Str("peer_name", name).
+				Str("peer_address", peer.Address).
+				Msgf("Failovering to passive peer %s", style.RenderPassiveString(name, false))
+			return peer, nil
+		}
+	}
+
+	// Multiple peers - show selection prompt
 	huhPeerOptions := make([]huh.Option[string], 0)
 	for name, peer := range v.Peers {
 		selectionKey := style.RenderPassiveString(name, false)
