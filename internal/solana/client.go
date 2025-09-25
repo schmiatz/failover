@@ -21,6 +21,7 @@ type RPCClientInterface interface {
 	GetLeaderSchedule(ctx context.Context) (rpc.GetLeaderScheduleResult, error)
 	GetBlockTime(ctx context.Context, slot uint64) (*solanago.UnixTimeSeconds, error)
 	GetHealth(ctx context.Context) (string, error)
+	GetRecentPerformanceSamples(ctx context.Context, limit *uint64) ([]rpc.PerformanceSample, error)
 }
 
 // ClientInterface defines the interface for solana rpc operations - just simple wrappers around the rpc client
@@ -295,7 +296,8 @@ func (c *Client) getAverageSlotTime() (time.Duration, error) {
 	// Retry logic for performance samples
 	maxRetries := 3
 	for i := 0; i < maxRetries; i++ {
-		samples, err := c.networkRPCClient.GetRecentPerformanceSamples(context.Background(), 10)
+		limit := uint64(10)
+		samples, err := c.networkRPCClient.GetRecentPerformanceSamples(context.Background(), &limit)
 		if err == nil && len(samples) > 0 && samples[0].NumSlots > 0 {
 			sample := samples[0]
 			avgSlotTimeMs := float64(sample.SamplePeriodSecs) / float64(sample.NumSlots) * 1000
