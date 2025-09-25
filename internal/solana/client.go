@@ -18,7 +18,7 @@ type RPCClientInterface interface {
 	GetClusterNodes(ctx context.Context) ([]*rpc.GetClusterNodesResult, error)
 	GetVoteAccounts(ctx context.Context, opts *rpc.GetVoteAccountsOpts) (*rpc.GetVoteAccountsResult, error)
 	GetSlot(ctx context.Context, commitment rpc.CommitmentType) (uint64, error)
-	GetLeaderSchedule(ctx context.Context, opts *rpc.GetLeaderScheduleOpts) (rpc.GetLeaderScheduleResult, error)
+	GetLeaderSchedule(ctx context.Context) (rpc.GetLeaderScheduleResult, error)
 	GetBlockTime(ctx context.Context, slot uint64) (*solanago.UnixTimeSeconds, error)
 	GetHealth(ctx context.Context) (string, error)
 }
@@ -227,10 +227,8 @@ func (c *Client) GetTimeToNextLeaderSlotForPubkey(pubkey solanago.PublicKey) (is
 		return false, time.Duration(0), fmt.Errorf("failed to get current slot: %w", err)
 	}
 
-	// get the leader schedule filtered by identity
-	leaderSchedule, err := c.networkRPCClient.GetLeaderSchedule(context.Background(), &rpc.GetLeaderScheduleOpts{
-		Identity: &pubkey,
-	})
+	// get the leader schedule
+	leaderSchedule, err := c.networkRPCClient.GetLeaderSchedule(context.Background())
 	if err != nil {
 		return false, time.Duration(0), fmt.Errorf("failed to get leader schedule: %w", err)
 	}
@@ -240,6 +238,23 @@ func (c *Client) GetTimeToNextLeaderSlotForPubkey(pubkey solanago.PublicKey) (is
 
 	// pubkey not in leader schedule
 	if !ok {
+		// Log debug information to help diagnose the issue
+		log.Debug().
+			Str("validator_pubkey", pubkey.String()).
+			Int("total_validators_in_schedule", len(leaderSchedule)).
+			Msg("validator not found in leader schedule")
+		
+		// Log first few validators in schedule for debugging
+		count := 0
+		for schedulePubkey := range leaderSchedule {
+			if count < 3 {
+				log.Debug().
+					Str("schedule_pubkey", schedulePubkey.String()).
+					Msg("sample validator in leader schedule")
+				count++
+			}
+		}
+		
 		return false, time.Duration(0), nil
 	}
 
