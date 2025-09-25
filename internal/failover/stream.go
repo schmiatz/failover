@@ -225,24 +225,8 @@ Failing over will:
 	// print confirm message
 	fmt.Println(style.RenderMessageString(buf.String()))
 
-	var confirmFailover bool
-	// ask to proceed
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Proceed with failover?").
-				Value(&confirmFailover),
-		),
-	)
-
-	err = form.Run()
-	if err != nil {
-		return fmt.Errorf("server cancelled failover: %w", err)
-	}
-
-	if !confirmFailover {
-		return fmt.Errorf("server cancelled failover")
-	}
+	// automatically proceed with failover without confirmation
+	fmt.Println(style.RenderActiveString("Proceeding with failover", false))
 
 	return nil
 }
