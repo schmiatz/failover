@@ -21,6 +21,7 @@ type RPCClientInterface interface {
 	GetLeaderSchedule(ctx context.Context) (rpc.GetLeaderScheduleResult, error)
 	GetBlockTime(ctx context.Context, slot uint64) (*solanago.UnixTimeSeconds, error)
 	GetHealth(ctx context.Context) (string, error)
+	GetEpochInfo(ctx context.Context) (*rpc.GetEpochInfoResult, error)
 }
 
 // ClientInterface defines the interface for solana rpc operations - just simple wrappers around the rpc client
@@ -227,56 +228,63 @@ func (c *Client) GetTimeToNextLeaderSlotForPubkey(pubkey solanago.PublicKey) (is
 		return false, time.Duration(0), fmt.Errorf("failed to get current slot: %w", err)
 	}
 
-	// get the leader schedule
+	// get epoch info to calculate first slot of current epoch
+	epochInfo, err := c.networkRPCClient.GetEpochInfo(context.Background())
+	if err != nil {
+		return false, time.Duration(0), fmt.Errorf("failed to get epoch info: %w", err)
+	}
+
+	// calculate first slot of current epoch
+	firstSlotOfEpoch := epochInfo.AbsoluteSlot - epochInfo.SlotIndex
+
+	log.Debug().
+		Uint64("current_slot", currentSlot).
+		Uint64("absolute_slot", epochInfo.AbsoluteSlot).
+		Uint64("slot_index", epochInfo.SlotIndex).
+		Uint64("first_slot_of_epoch", firstSlotOfEpoch).
+		Uint64("epoch", epochInfo.Epoch).
+		Msg("epoch info for leader slot calculation")
+
+	// get the leader schedule (returns relative slot indices within the epoch)
 	leaderSchedule, err := c.networkRPCClient.GetLeaderSchedule(context.Background())
 	if err != nil {
 		return false, time.Duration(0), fmt.Errorf("failed to get leader schedule: %w", err)
 	}
 
-	// get upcoming slots for the pubkey
-	slots, ok := leaderSchedule[pubkey]
+	// get upcoming slots for the pubkey (these are relative slot indices)
+	relativeSlots, ok := leaderSchedule[pubkey]
 
 	// pubkey not in leader schedule
 	if !ok {
-		// Log debug information to help diagnose the issue
 		log.Debug().
 			Str("validator_pubkey", pubkey.String()).
 			Int("total_validators_in_schedule", len(leaderSchedule)).
 			Msg("validator not found in leader schedule")
-		
-		// Log first few validators in schedule for debugging
-		count := 0
-		for schedulePubkey := range leaderSchedule {
-			if count < 3 {
-				log.Debug().
-					Str("schedule_pubkey", schedulePubkey.String()).
-					Msg("sample validator in leader schedule")
-				count++
-			}
-		}
-		
 		return false, time.Duration(0), nil
 	}
 
 	var nextLeaderSlot uint64
 
-	// Log all slots for debugging
 	log.Debug().
 		Str("validator_pubkey", pubkey.String()).
 		Uint64("current_slot", currentSlot).
-		Int("total_slots", len(slots)).
-		Msg("checking slots for future leader slots")
+		Uint64("first_slot_of_epoch", firstSlotOfEpoch).
+		Int("total_relative_slots", len(relativeSlots)).
+		Msg("checking relative slots for future leader slots")
 
-	// Find the next future slot
-	for _, s := range slots {
-		log.Debug().
-			Uint64("slot", s).
-			Uint64("current_slot", currentSlot).
-			Bool("is_future", s > currentSlot).
-			Msg("checking slot")
+	// Convert relative slots to absolute slots and find the next future slot
+	for _, relativeSlot := range relativeSlots {
+		absoluteSlot := firstSlotOfEpoch + relativeSlot
 		
-		if s > currentSlot {
-			nextLeaderSlot = s
+		log.Debug().
+			Uint64("relative_slot", relativeSlot).
+			Uint64("absolute_slot", absoluteSlot).
+			Uint64("current_slot", currentSlot).
+			Bool("is_future", absoluteSlot > currentSlot).
+			Msg("checking converted slot")
+		
+		if absoluteSlot > currentSlot {
+			nextLeaderSlot = absoluteSlot
 			log.Debug().
 				Uint64("next_leader_slot", nextLeaderSlot).
 				Msg("found next future leader slot")
@@ -286,25 +294,24 @@ func (c *Client) GetTimeToNextLeaderSlotForPubkey(pubkey solanago.PublicKey) (is
 
 	// didn't find future slots for the pubkey
 	if nextLeaderSlot == 0 {
-		// Log debug information for no future slots case
 		log.Debug().
 			Str("validator_pubkey", pubkey.String()).
 			Uint64("current_slot", currentSlot).
-			Int("total_slots_in_schedule", len(slots)).
+			Uint64("first_slot_of_epoch", firstSlotOfEpoch).
+			Int("total_relative_slots", len(relativeSlots)).
 			Msg("validator found in leader schedule but has no future slots in current epoch")
 		
-		// Log some sample slots for debugging
-		if len(slots) > 0 {
-			sampleSlots := slots
-			if len(slots) > 5 {
-				sampleSlots = slots[:5]
+		// Log some sample relative slots for debugging
+		if len(relativeSlots) > 0 {
+			sampleSlots := relativeSlots
+			if len(relativeSlots) > 5 {
+				sampleSlots = relativeSlots[:5]
 			}
 			log.Debug().
-				Uints64("sample_slots", sampleSlots).
-				Msg("sample slots from leader schedule")
+				Uints64("sample_relative_slots", sampleSlots).
+				Msg("sample relative slots from leader schedule")
 		}
 		
-		// return indefinite time
 		return false, time.Duration(0), nil
 	}
 
@@ -320,11 +327,20 @@ func (c *Client) GetTimeToNextLeaderSlotForPubkey(pubkey solanago.PublicKey) (is
 	// Calculate time to next leader slot based on slots and average slot time
 	timeToNextLeaderSlot = time.Duration(slotsUntilLeader) * avgSlotTime
 
+	log.Debug().
+		Uint64("next_leader_slot", nextLeaderSlot).
+		Uint64("current_slot", currentSlot).
+		Uint64("slots_until_leader", slotsUntilLeader).
+		Dur("avg_slot_time", avgSlotTime).
+		Dur("time_to_next_leader_slot", timeToNextLeaderSlot).
+		Msg("calculated time to next leader slot")
+
 	return true, timeToNextLeaderSlot, nil
 }
 
 // getAverageSlotTime returns the average slot time
 // Uses a fixed 400ms slot time as a reasonable approximation for Solana
+// TODO: Could be enhanced to use getRecentPerformanceSamples for dynamic calculation
 func (c *Client) getAverageSlotTime() (time.Duration, error) {
 	// Check cache first (valid for 30 seconds)
 	c.performanceCache.mutex.RLock()
