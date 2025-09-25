@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	solanago "github.com/gagliardetto/solana-go"
@@ -47,6 +48,11 @@ type ClientInterface interface {
 type Client struct {
 	localRPCClient   RPCClientInterface
 	networkRPCClient RPCClientInterface
+	performanceCache struct {
+		avgSlotTime  time.Duration
+		lastUpdated  time.Time
+		mutex        sync.RWMutex
+	}
 }
 
 // NewClientParams is the parameters for creating a new client
@@ -250,14 +256,78 @@ func (c *Client) GetTimeToNextLeaderSlotForPubkey(pubkey solanago.PublicKey) (is
 		return false, time.Duration(0), nil
 	}
 
-	// get the block time for the next leader slot
-	nextLeaderSlotBlockTime, err := c.networkRPCClient.GetBlockTime(context.Background(), nextLeaderSlot)
+	// Calculate slots until leader slot
+	slotsUntilLeader := nextLeaderSlot - currentSlot
+	
+	// Get average slot time from recent performance
+	avgSlotTime, err := c.getAverageSlotTime()
 	if err != nil {
-		return false, time.Duration(0), fmt.Errorf("failed to get block time for next leader slot: %w", err)
+		return false, time.Duration(0), fmt.Errorf("failed to get average slot time: %w", err)
 	}
-
-	// calculate time to next leader slot
-	timeToNextLeaderSlot = time.Until(time.Unix(int64(*nextLeaderSlotBlockTime), 0))
+	
+	// Calculate time to next leader slot based on slots and average slot time
+	timeToNextLeaderSlot = time.Duration(slotsUntilLeader) * avgSlotTime
 
 	return true, timeToNextLeaderSlot, nil
+}
+
+// getAverageSlotTime returns the average slot time based on recent performance samples
+// Uses caching to avoid excessive RPC calls and includes retry logic with fallback
+func (c *Client) getAverageSlotTime() (time.Duration, error) {
+	// Check cache first (valid for 30 seconds)
+	c.performanceCache.mutex.RLock()
+	if time.Since(c.performanceCache.lastUpdated) < 30*time.Second {
+		avgSlotTime := c.performanceCache.avgSlotTime
+		c.performanceCache.mutex.RUnlock()
+		return avgSlotTime, nil
+	}
+	c.performanceCache.mutex.RUnlock()
+
+	// Cache expired, fetch new data
+	c.performanceCache.mutex.Lock()
+	defer c.performanceCache.mutex.Unlock()
+
+	// Double-check in case another goroutine updated it
+	if time.Since(c.performanceCache.lastUpdated) < 30*time.Second {
+		return c.performanceCache.avgSlotTime, nil
+	}
+
+	// Retry logic for performance samples
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		samples, err := c.networkRPCClient.GetRecentPerformanceSamples(context.Background(), 10)
+		if err == nil && len(samples) > 0 && samples[0].NumSlots > 0 {
+			sample := samples[0]
+			avgSlotTimeMs := float64(sample.SamplePeriodSecs) / float64(sample.NumSlots) * 1000
+			avgSlotTime := time.Duration(avgSlotTimeMs) * time.Millisecond
+			
+			// Update cache
+			c.performanceCache.avgSlotTime = avgSlotTime
+			c.performanceCache.lastUpdated = time.Now()
+			
+			log.Debug().
+				Float64("avg_slot_time_ms", avgSlotTimeMs).
+				Int("num_slots", sample.NumSlots).
+				Int("sample_period_secs", sample.SamplePeriodSecs).
+				Msg("updated performance cache with recent samples")
+			
+			return avgSlotTime, nil
+		}
+		
+		if i < maxRetries-1 {
+			log.Debug().Err(err).Msgf("failed to get performance samples, retrying in 1s (attempt %d/%d)", i+1, maxRetries)
+			time.Sleep(1 * time.Second) // Wait 1 second before retry
+		}
+	}
+
+	// All retries failed, use fallback
+	fallbackTime := 400 * time.Millisecond
+	c.performanceCache.avgSlotTime = fallbackTime
+	c.performanceCache.lastUpdated = time.Now()
+	
+	log.Warn().
+		Dur("fallback_time", fallbackTime).
+		Msg("failed to get performance samples after retries, using fallback slot time")
+	
+	return fallbackTime, nil
 }
