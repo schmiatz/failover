@@ -293,11 +293,21 @@ func (c *Client) waitMinTimeToLeaderSlot() (err error) {
 			}
 
 			if !isOnLeaderSchedule {
+				c.logger.Info().
+					Msg("This validator is not on the leader schedule, skipping wait for next leader slot to pass")
 				sp.Title(style.RenderActiveString("This validator is not on the leader schedule, skipping wait for next leader slot to pass", false))
 				return nil
 			}
 
 			if timeToNextLeaderSlot < c.minTimeToLeaderSlot {
+				// Log that we're waiting because next leader slot is too soon
+				c.logger.Info().
+					Dur("time_to_next_leader_slot", timeToNextLeaderSlot).
+					Dur("min_time_to_leader_slot", c.minTimeToLeaderSlot).
+					Msgf("Next leader slot in %s is too soon (minimum required: %s), waiting...",
+						timeToNextLeaderSlot.Round(time.Second).String(),
+						c.minTimeToLeaderSlot.String())
+				
 				// show duration as human readable time until leader slot
 				sp.Title(style.RenderActiveString(
 					fmt.Sprintf("Next leader slot in %s, waiting for it before proceeding...",
@@ -307,6 +317,14 @@ func (c *Client) waitMinTimeToLeaderSlot() (err error) {
 				time.Sleep(sleepDuration)
 				continue
 			}
+
+			// Log that we can proceed because next leader slot is far enough away
+			c.logger.Info().
+				Dur("time_to_next_leader_slot", timeToNextLeaderSlot).
+				Dur("min_time_to_leader_slot", c.minTimeToLeaderSlot).
+				Msgf("Next leader slot in %s is far enough away (minimum required: %s), proceeding with failover",
+					timeToNextLeaderSlot.Round(time.Second).String(),
+					c.minTimeToLeaderSlot.String())
 
 			sp.Title(style.RenderActiveString(
 				fmt.Sprintf("Next leader slot in %s > %s, proceeding...",
