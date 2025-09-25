@@ -18,6 +18,7 @@ import (
 	"github.com/sol-strategies/solana-validator-failover/internal/solana"
 	"github.com/sol-strategies/solana-validator-failover/internal/style"
 	"github.com/sol-strategies/solana-validator-failover/internal/utils"
+	"github.com/sol-strategies/solana-validator-failover/internal/validator"
 	pkgconstants "github.com/sol-strategies/solana-validator-failover/pkg/constants"
 )
 
@@ -30,6 +31,7 @@ type ServerConfig struct {
 	SolanaRPCClient   solana.ClientInterface
 	IsDryRunFailover  bool
 	Hooks             hooks.FailoverHooks
+	MonitorConfig     validator.MonitorConfig
 }
 
 // Server is the failover server - run by the passive node
@@ -49,6 +51,7 @@ type Server struct {
 	isDryRunFailover  bool
 	activeConn        quic.Connection
 	hooks             hooks.FailoverHooks
+	monitorConfig     validator.MonitorConfig
 }
 
 // NewServerFromConfig creates a new failover server from a configuration
@@ -76,6 +79,7 @@ func NewServerFromConfig(config ServerConfig) (*Server, error) {
 		solanaRPCClient:  config.SolanaRPCClient,
 		isDryRunFailover: config.IsDryRunFailover,
 		hooks:            config.Hooks,
+		monitorConfig:    config.MonitorConfig,
 	}
 
 	if s.port == 0 {
@@ -190,6 +194,9 @@ func (s *Server) handleFailoverStream(stream quic.Stream) {
 	if s.failoverStream.Decode() != nil {
 		return
 	}
+
+	// set the monitor configuration
+	s.failoverStream.SetMonitorConfig(s.monitorConfig)
 
 	// set the is dry run failover flag
 	s.failoverStream.SetIsDryRunFailover(s.isDryRunFailover)
@@ -414,9 +421,9 @@ func (s *Server) handleFailoverStream(stream quic.Stream) {
 		s.confirmGossipNodesPostFailover()
 	}
 
-	// monitor the credits by pulling 5 samples
+	// monitor the credits by pulling configured samples
 	s.logger.Info().Msg("🩺 Monitoring vote credits post-failover...")
-	err = s.failoverStream.PullActiveIdentityVoteCreditsSamples(s.solanaRPCClient, 5)
+	err = s.failoverStream.PullActiveIdentityVoteCreditsSamples(s.solanaRPCClient, s.failoverStream.GetMonitorConfig().CreditSamples.Count)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("failed to pull active identity vote credits samples")
 		return

@@ -63,6 +63,7 @@ type Validator struct {
 	SetIdentityPassiveCommand      string
 	TowerFile                      string
 	TowerFileAutoDeleteWhenPassive bool
+	Monitor                        MonitorConfig
 
 	logger          zerolog.Logger
 	solanaRPCClient solana.ClientInterface
@@ -167,6 +168,12 @@ func (v *Validator) NewFromConfig(cfg *Config) error {
 
 	// get server
 	err = v.configureServer(cfg.Failover.Server)
+	if err != nil {
+		return err
+	}
+
+	// configure monitor
+	err = v.configureMonitor(cfg.Failover.Monitor)
 	if err != nil {
 		return err
 	}
@@ -516,6 +523,16 @@ func (v *Validator) configureServer(cfg ServerConfig) (err error) {
 	return nil
 }
 
+// configureMonitor ensures the monitor is valid and sets it
+func (v *Validator) configureMonitor(cfg MonitorConfig) (err error) {
+	v.Monitor = cfg
+	v.logger.Debug().
+		Int("credit_samples_count", v.Monitor.CreditSamples.Count).
+		Str("credit_samples_interval", v.Monitor.CreditSamples.Interval).
+		Msg("monitor set")
+	return nil
+}
+
 // configureGossipNode ensures the gossip node is valid and sets it
 func (v *Validator) configureGossipNode() (err error) {
 	v.GossipNode, err = v.solanaRPCClient.NodeFromIP(v.PublicIP)
@@ -589,6 +606,7 @@ func (v *Validator) makeActive(params FailoverParams) (err error) {
 		SolanaRPCClient:  v.solanaRPCClient,
 		IsDryRunFailover: !params.NotADrill,
 		Hooks:            v.Hooks,
+		MonitorConfig:    v.Monitor,
 	})
 	if err != nil {
 		return err

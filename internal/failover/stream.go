@@ -245,6 +245,16 @@ func (s *Stream) GetStateTable() string {
 	return s.message.currentStateTableString()
 }
 
+// GetMonitorConfig returns the monitor configuration
+func (s *Stream) GetMonitorConfig() validator.MonitorConfig {
+	return s.message.MonitorConfig
+}
+
+// SetMonitorConfig sets the monitor configuration
+func (s *Stream) SetMonitorConfig(config validator.MonitorConfig) {
+	s.message.MonitorConfig = config
+}
+
 // GetFailoverDurationTableString returns the failover duration table string
 func (s *Stream) GetFailoverDurationTableString() string {
 	stageColumnRows := formatStageColumnRows(
@@ -392,7 +402,12 @@ func (s *Stream) PullActiveIdentityVoteCreditsSamples(solanaRPCClient solana.Cli
 
 	// multiple samples may take some time so show a spinner to keep you patient
 	var sp *spinner.Spinner
-	interval := 5 * time.Second
+	interval := 5 * time.Second // default fallback
+	if s.message.MonitorConfig.CreditSamples.Interval != "" {
+		if parsedInterval, err := time.ParseDuration(s.message.MonitorConfig.CreditSamples.Interval); err == nil {
+			interval = parsedInterval
+		}
+	}
 	sp = spinner.New().Title(fmt.Sprintf("Pulling %d vote credit samples %s apart...", nSamples, interval))
 
 	sampleCount := 0

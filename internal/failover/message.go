@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/sol-strategies/solana-validator-failover/internal/style"
+	"github.com/sol-strategies/solana-validator-failover/internal/validator"
 )
 
 // Message represents the message data that can be encoded/decoded
@@ -27,6 +28,7 @@ type Message struct {
 	FailoverEndSlot                  uint64
 	// key is the identity pubkey
 	CreditSamples CreditSamples
+	MonitorConfig                    validator.MonitorConfig
 }
 
 func (m *Message) currentStateTableString() string {
