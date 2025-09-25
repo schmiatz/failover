@@ -21,7 +21,7 @@ type RPCClientInterface interface {
 	GetLeaderSchedule(ctx context.Context) (rpc.GetLeaderScheduleResult, error)
 	GetBlockTime(ctx context.Context, slot uint64) (*solanago.UnixTimeSeconds, error)
 	GetHealth(ctx context.Context) (string, error)
-	GetEpochInfo(ctx context.Context) (*rpc.GetEpochInfoResult, error)
+	GetEpochInfo(ctx context.Context, commitment rpc.CommitmentType) (*rpc.GetEpochInfoResult, error)
 }
 
 // ClientInterface defines the interface for solana rpc operations - just simple wrappers around the rpc client
@@ -229,7 +229,7 @@ func (c *Client) GetTimeToNextLeaderSlotForPubkey(pubkey solanago.PublicKey) (is
 	}
 
 	// get epoch info to calculate first slot of current epoch
-	epochInfo, err := c.networkRPCClient.GetEpochInfo(context.Background())
+	epochInfo, err := c.networkRPCClient.GetEpochInfo(context.Background(), rpc.CommitmentProcessed)
 	if err != nil {
 		return false, time.Duration(0), fmt.Errorf("failed to get epoch info: %w", err)
 	}
