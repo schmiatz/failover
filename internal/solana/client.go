@@ -260,9 +260,26 @@ func (c *Client) GetTimeToNextLeaderSlotForPubkey(pubkey solanago.PublicKey) (is
 
 	var nextLeaderSlot uint64
 
+	// Log all slots for debugging
+	log.Debug().
+		Str("validator_pubkey", pubkey.String()).
+		Uint64("current_slot", currentSlot).
+		Int("total_slots", len(slots)).
+		Msg("checking slots for future leader slots")
+
+	// Find the next future slot
 	for _, s := range slots {
+		log.Debug().
+			Uint64("slot", s).
+			Uint64("current_slot", currentSlot).
+			Bool("is_future", s > currentSlot).
+			Msg("checking slot")
+		
 		if s > currentSlot {
 			nextLeaderSlot = s
+			log.Debug().
+				Uint64("next_leader_slot", nextLeaderSlot).
+				Msg("found next future leader slot")
 			break
 		}
 	}
