@@ -21,7 +21,6 @@ type RPCClientInterface interface {
 	GetLeaderSchedule(ctx context.Context) (rpc.GetLeaderScheduleResult, error)
 	GetBlockTime(ctx context.Context, slot uint64) (*solanago.UnixTimeSeconds, error)
 	GetHealth(ctx context.Context) (string, error)
-	GetRecentPerformanceSamples(ctx context.Context, limit *uint64) ([]rpc.PerformanceSample, error)
 }
 
 // ClientInterface defines the interface for solana rpc operations - just simple wrappers around the rpc client
@@ -272,8 +271,8 @@ func (c *Client) GetTimeToNextLeaderSlotForPubkey(pubkey solanago.PublicKey) (is
 	return true, timeToNextLeaderSlot, nil
 }
 
-// getAverageSlotTime returns the average slot time based on recent performance samples
-// Uses caching to avoid excessive RPC calls and includes retry logic with fallback
+// getAverageSlotTime returns the average slot time
+// Uses a fixed 400ms slot time as a reasonable approximation for Solana
 func (c *Client) getAverageSlotTime() (time.Duration, error) {
 	// Check cache first (valid for 30 seconds)
 	c.performanceCache.mutex.RLock()
@@ -284,7 +283,7 @@ func (c *Client) getAverageSlotTime() (time.Duration, error) {
 	}
 	c.performanceCache.mutex.RUnlock()
 
-	// Cache expired, fetch new data
+	// Cache expired, update with fixed slot time
 	c.performanceCache.mutex.Lock()
 	defer c.performanceCache.mutex.Unlock()
 
@@ -293,43 +292,14 @@ func (c *Client) getAverageSlotTime() (time.Duration, error) {
 		return c.performanceCache.avgSlotTime, nil
 	}
 
-	// Retry logic for performance samples
-	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
-		limit := uint64(10)
-		samples, err := c.networkRPCClient.GetRecentPerformanceSamples(context.Background(), &limit)
-		if err == nil && len(samples) > 0 && samples[0].NumSlots > 0 {
-			sample := samples[0]
-			avgSlotTimeMs := float64(sample.SamplePeriodSecs) / float64(sample.NumSlots) * 1000
-			avgSlotTime := time.Duration(avgSlotTimeMs) * time.Millisecond
-			
-			// Update cache
-			c.performanceCache.avgSlotTime = avgSlotTime
-			c.performanceCache.lastUpdated = time.Now()
-			
-			log.Debug().
-				Float64("avg_slot_time_ms", avgSlotTimeMs).
-				Int("num_slots", sample.NumSlots).
-				Int("sample_period_secs", sample.SamplePeriodSecs).
-				Msg("updated performance cache with recent samples")
-			
-			return avgSlotTime, nil
-		}
-		
-		if i < maxRetries-1 {
-			log.Debug().Err(err).Msgf("failed to get performance samples, retrying in 1s (attempt %d/%d)", i+1, maxRetries)
-			time.Sleep(1 * time.Second) // Wait 1 second before retry
-		}
-	}
-
-	// All retries failed, use fallback
-	fallbackTime := 400 * time.Millisecond
-	c.performanceCache.avgSlotTime = fallbackTime
+	// Use fixed 400ms slot time (reasonable approximation for Solana)
+	avgSlotTime := 400 * time.Millisecond
+	c.performanceCache.avgSlotTime = avgSlotTime
 	c.performanceCache.lastUpdated = time.Now()
 	
-	log.Warn().
-		Dur("fallback_time", fallbackTime).
-		Msg("failed to get performance samples after retries, using fallback slot time")
+	log.Debug().
+		Dur("avg_slot_time", avgSlotTime).
+		Msg("using fixed slot time for leader slot calculation")
 	
-	return fallbackTime, nil
+	return avgSlotTime, nil
 }
