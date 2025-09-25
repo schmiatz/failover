@@ -269,6 +269,24 @@ func (c *Client) GetTimeToNextLeaderSlotForPubkey(pubkey solanago.PublicKey) (is
 
 	// didn't find future slots for the pubkey
 	if nextLeaderSlot == 0 {
+		// Log debug information for no future slots case
+		log.Debug().
+			Str("validator_pubkey", pubkey.String()).
+			Uint64("current_slot", currentSlot).
+			Int("total_slots_in_schedule", len(slots)).
+			Msg("validator found in leader schedule but has no future slots in current epoch")
+		
+		// Log some sample slots for debugging
+		if len(slots) > 0 {
+			sampleSlots := slots
+			if len(slots) > 5 {
+				sampleSlots = slots[:5]
+			}
+			log.Debug().
+				Uints64("sample_slots", sampleSlots).
+				Msg("sample slots from leader schedule")
+		}
+		
 		// return indefinite time
 		return false, time.Duration(0), nil
 	}
