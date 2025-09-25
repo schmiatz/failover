@@ -246,12 +246,12 @@ func (s *Stream) GetStateTable() string {
 }
 
 // GetMonitorConfig returns the monitor configuration
-func (s *Stream) GetMonitorConfig() validator.MonitorConfig {
+func (s *Stream) GetMonitorConfig() MonitorConfig {
 	return s.message.MonitorConfig
 }
 
 // SetMonitorConfig sets the monitor configuration
-func (s *Stream) SetMonitorConfig(config validator.MonitorConfig) {
+func (s *Stream) SetMonitorConfig(config MonitorConfig) {
 	s.message.MonitorConfig = config
 }
 

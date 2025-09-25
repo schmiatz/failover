@@ -606,7 +606,7 @@ func (v *Validator) makeActive(params FailoverParams) (err error) {
 		SolanaRPCClient:  v.solanaRPCClient,
 		IsDryRunFailover: !params.NotADrill,
 		Hooks:            v.Hooks,
-		MonitorConfig:    v.Monitor,
+		MonitorConfig:    convertMonitorConfig(v.Monitor),
 	})
 	if err != nil {
 		return err
@@ -746,4 +746,14 @@ func (v *Validator) selectPassivePeer() (selectedPeer Peer, err error) {
 	log.Debug().Msgf("selected peer: %s address: %s", selectedPeerName, v.Peers[selectedPeerName].Address)
 
 	return v.Peers[selectedPeerName], nil
+}
+
+// convertMonitorConfig converts validator.MonitorConfig to failover.MonitorConfig
+func convertMonitorConfig(cfg MonitorConfig) failover.MonitorConfig {
+	return failover.MonitorConfig{
+		CreditSamples: failover.CreditSamplesConfig{
+			Count:    cfg.CreditSamples.Count,
+			Interval: cfg.CreditSamples.Interval,
+		},
+	}
 }

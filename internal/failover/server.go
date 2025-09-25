@@ -18,7 +18,6 @@ import (
 	"github.com/sol-strategies/solana-validator-failover/internal/solana"
 	"github.com/sol-strategies/solana-validator-failover/internal/style"
 	"github.com/sol-strategies/solana-validator-failover/internal/utils"
-	"github.com/sol-strategies/solana-validator-failover/internal/validator"
 	pkgconstants "github.com/sol-strategies/solana-validator-failover/pkg/constants"
 )
 
@@ -31,7 +30,7 @@ type ServerConfig struct {
 	SolanaRPCClient   solana.ClientInterface
 	IsDryRunFailover  bool
 	Hooks             hooks.FailoverHooks
-	MonitorConfig     validator.MonitorConfig
+	MonitorConfig     MonitorConfig
 }
 
 // Server is the failover server - run by the passive node
@@ -51,7 +50,7 @@ type Server struct {
 	isDryRunFailover  bool
 	activeConn        quic.Connection
 	hooks             hooks.FailoverHooks
-	monitorConfig     validator.MonitorConfig
+	monitorConfig     MonitorConfig
 }
 
 // NewServerFromConfig creates a new failover server from a configuration
