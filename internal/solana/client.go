@@ -18,7 +18,7 @@ type RPCClientInterface interface {
 	GetClusterNodes(ctx context.Context) ([]*rpc.GetClusterNodesResult, error)
 	GetVoteAccounts(ctx context.Context, opts *rpc.GetVoteAccountsOpts) (*rpc.GetVoteAccountsResult, error)
 	GetSlot(ctx context.Context, commitment rpc.CommitmentType) (uint64, error)
-	GetLeaderSchedule(ctx context.Context) (rpc.GetLeaderScheduleResult, error)
+	GetLeaderSchedule(ctx context.Context, opts *rpc.GetLeaderScheduleOpts) (rpc.GetLeaderScheduleResult, error)
 	GetBlockTime(ctx context.Context, slot uint64) (*solanago.UnixTimeSeconds, error)
 	GetHealth(ctx context.Context) (string, error)
 }
@@ -191,7 +191,7 @@ func (c *Client) GetCreditRankedVoteAccountFromPubkey(pubkey string) (voteAccoun
 
 // GetCurrentSlot returns the current slot
 func (c *Client) GetCurrentSlot() (slot uint64, err error) {
-	slot, err = c.localRPCClient.GetSlot(context.Background(), rpc.CommitmentConfirmed)
+	slot, err = c.networkRPCClient.GetSlot(context.Background(), rpc.CommitmentConfirmed)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get slot: %w", err)
 	}
@@ -227,36 +227,21 @@ func (c *Client) GetTimeToNextLeaderSlotForPubkey(pubkey solanago.PublicKey) (is
 		return false, time.Duration(0), fmt.Errorf("failed to get current slot: %w", err)
 	}
 
-	// get the leader schedule
-	leaderSchedule, err := c.networkRPCClient.GetLeaderSchedule(context.Background())
+	// get the leader schedule filtered by identity
+	leaderSchedule, err := c.networkRPCClient.GetLeaderSchedule(context.Background(), &rpc.GetLeaderScheduleOpts{
+		Identity: &pubkey,
+	})
 	if err != nil {
 		return false, time.Duration(0), fmt.Errorf("failed to get leader schedule: %w", err)
 	}
 
-	// Debug logging
-	log.Debug().
-		Uint64("current_slot", currentSlot).
-		Str("validator_pubkey", pubkey.String()).
-		Int("total_leaders_in_schedule", len(leaderSchedule)).
-		Msg("checking leader schedule for validator")
-
-	// get upcoming slots fo the pubkey
+	// get upcoming slots for the pubkey
 	slots, ok := leaderSchedule[pubkey]
 
 	// pubkey not in leader schedule
 	if !ok {
-		log.Debug().
-			Str("validator_pubkey", pubkey.String()).
-			Uint64("current_slot", currentSlot).
-			Msg("validator not found in leader schedule")
 		return false, time.Duration(0), nil
 	}
-
-	log.Debug().
-		Str("validator_pubkey", pubkey.String()).
-		Uint64("current_slot", currentSlot).
-		Int("total_slots_assigned", len(slots)).
-		Msg("validator found in leader schedule")
 
 	var nextLeaderSlot uint64
 
