@@ -1,4 +1,4 @@
-FROM golang:1.24-bullseye
+FROM golang:1.23-bullseye
 ARG APP_VERSION
 ARG APP_NAME
 ARG BUILD_OS_ARCH_LIST
