@@ -884,10 +884,6 @@ func TestGossipClient_GetTimeToNextLeaderSlotForPubkey_Success(t *testing.T) {
 
 	// Setup mock expectations
 	currentSlot := uint64(1000)
-	nextLeaderSlot := uint64(1050) // first_slot_of_epoch (1000) + relative_slot (50) - first future slot
-	// Use a future timestamp (1 hour from now)
-	futureTime := time.Now().UTC().Add(1 * time.Hour)
-	expectedBlockTime := solanago.UnixTimeSeconds(uint64(futureTime.Unix()))
 	pubkey := createTestPublicKey(1)
 
 	leaderSchedule := rpc.GetLeaderScheduleResult{
@@ -901,7 +897,6 @@ func TestGossipClient_GetTimeToNextLeaderSlotForPubkey_Success(t *testing.T) {
 		Epoch:        1,
 	}, nil)
 	networkMock.On("GetLeaderSchedule", mock.Anything).Return(leaderSchedule, nil)
-	networkMock.On("GetBlockTime", mock.Anything, nextLeaderSlot).Return(&expectedBlockTime, nil)
 
 	// Test the function
 	isOnSchedule, timeToNext, err := client.GetTimeToNextLeaderSlotForPubkey(pubkey)
@@ -956,7 +951,7 @@ func TestGossipClient_GetTimeToNextLeaderSlotForPubkey_NoFutureSlots(t *testing.
 	pubkey := createTestPublicKey(1)
 
 	leaderSchedule := rpc.GetLeaderScheduleResult{
-		pubkey: []uint64{0, 10, 20}, // all past/current slots relative to current position
+		pubkey: []uint64{0}, // only current slot, no future slots
 	}
 
 	networkMock.On("GetSlot", mock.Anything, rpc.CommitmentConfirmed).Return(currentSlot, nil)
@@ -1033,7 +1028,6 @@ func TestGossipClient_GetTimeToNextLeaderSlotForPubkey_GetBlockTimeError(t *test
 
 	// Setup mock expectations
 	currentSlot := uint64(1000)
-	nextLeaderSlot := uint64(1050) // first_slot_of_epoch (1000) + relative_slot (50) - first future slot
 	pubkey := createTestPublicKey(1)
 
 	leaderSchedule := rpc.GetLeaderScheduleResult{
@@ -1047,16 +1041,14 @@ func TestGossipClient_GetTimeToNextLeaderSlotForPubkey_GetBlockTimeError(t *test
 		Epoch:        1,
 	}, nil)
 	networkMock.On("GetLeaderSchedule", mock.Anything).Return(leaderSchedule, nil)
-	networkMock.On("GetBlockTime", mock.Anything, nextLeaderSlot).Return((*solanago.UnixTimeSeconds)(nil), errors.New("block time not available"))
 
 	// Test the function
 	isOnSchedule, timeToNext, err := client.GetTimeToNextLeaderSlotForPubkey(pubkey)
 
 	// Assertions
-	assert.Error(t, err)
-	assert.False(t, isOnSchedule)
-	assert.Equal(t, time.Duration(0), timeToNext)
-	assert.Contains(t, err.Error(), "failed to get block time for next leader slot")
+	require.NoError(t, err)
+	assert.True(t, isOnSchedule)
+	assert.Greater(t, timeToNext, time.Duration(0))
 
 	networkMock.AssertExpectations(t)
 }
@@ -1097,10 +1089,6 @@ func BenchmarkGossipClient_GetCurrentSlotEndTime(b *testing.B) {
 func BenchmarkGossipClient_GetTimeToNextLeaderSlotForPubkey(b *testing.B) {
 	mockClient := &MockRPCClient{}
 	currentSlot := uint64(1000)
-	nextLeaderSlot := uint64(1050) // first_slot_of_epoch (1000) + relative_slot (50) - first future slot
-	// Use a future timestamp (1 hour from now)
-	futureTime := time.Now().UTC().Add(1 * time.Hour)
-	expectedBlockTime := solanago.UnixTimeSeconds(uint64(futureTime.Unix()))
 	pubkey := createTestPublicKey(1)
 
 	leaderSchedule := rpc.GetLeaderScheduleResult{
@@ -1114,7 +1102,6 @@ func BenchmarkGossipClient_GetTimeToNextLeaderSlotForPubkey(b *testing.B) {
 		Epoch:        1,
 	}, nil)
 	mockClient.On("GetLeaderSchedule", mock.Anything).Return(leaderSchedule, nil)
-	mockClient.On("GetBlockTime", mock.Anything, nextLeaderSlot).Return(&expectedBlockTime, nil)
 
 	gossipClient := NewRPCClient(NewClientParams{
 		LocalRPCURL:   "http://localhost:8899",
