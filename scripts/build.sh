@@ -45,7 +45,7 @@ go_build() {
     for osarch in ${osarchList}; do
         os=$(echo "${osarch}" | cut -d '-' -f1)
         arch=$(echo "${osarch}" | cut -d '-' -f2)
-        binOutput="${BUILD_DIR}/${APP_NAME}-${APP_VERSION}-${os}-${arch}"
+	binOutput="${BUILD_DIR}/${APP_NAME}"
         log_info "building ${binOutput}"
         GOOS=${os} GOARCH=${arch} CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o "${binOutput}" || exit 1
         log_info "building ${binOutput} - complete"
