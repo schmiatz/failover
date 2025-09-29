@@ -905,8 +905,8 @@ func TestGossipClient_GetTimeToNextLeaderSlotForPubkey_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, isOnSchedule)
 	assert.Greater(t, timeToNext, time.Duration(0))
-	// Should be approximately 1 hour (with some tolerance for test execution time)
-	assert.True(t, timeToNext > 55*time.Minute && timeToNext < 65*time.Minute)
+	// Should be approximately 20 seconds (50 slots × 400ms = 20,000ms)
+	assert.True(t, timeToNext > 19*time.Second && timeToNext < 21*time.Second)
 
 	networkMock.AssertExpectations(t)
 }
