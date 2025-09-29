@@ -895,6 +895,11 @@ func TestGossipClient_GetTimeToNextLeaderSlotForPubkey_Success(t *testing.T) {
 	}
 
 	networkMock.On("GetSlot", mock.Anything, rpc.CommitmentConfirmed).Return(currentSlot, nil)
+	networkMock.On("GetEpochInfo", mock.Anything, rpc.CommitmentProcessed).Return(&rpc.GetEpochInfoResult{
+		AbsoluteSlot: currentSlot + 100,
+		SlotIndex:    100,
+		Epoch:        1,
+	}, nil)
 	networkMock.On("GetLeaderSchedule", mock.Anything).Return(leaderSchedule, nil)
 	networkMock.On("GetBlockTime", mock.Anything, nextLeaderSlot).Return(&expectedBlockTime, nil)
 
@@ -924,6 +929,11 @@ func TestGossipClient_GetTimeToNextLeaderSlotForPubkey_NotOnSchedule(t *testing.
 	}
 
 	networkMock.On("GetSlot", mock.Anything, rpc.CommitmentConfirmed).Return(currentSlot, nil)
+	networkMock.On("GetEpochInfo", mock.Anything, rpc.CommitmentProcessed).Return(&rpc.GetEpochInfoResult{
+		AbsoluteSlot: currentSlot + 100,
+		SlotIndex:    100,
+		Epoch:        1,
+	}, nil)
 	networkMock.On("GetLeaderSchedule", mock.Anything).Return(leaderSchedule, nil)
 
 	// Test the function
@@ -950,6 +960,11 @@ func TestGossipClient_GetTimeToNextLeaderSlotForPubkey_NoFutureSlots(t *testing.
 	}
 
 	networkMock.On("GetSlot", mock.Anything, rpc.CommitmentConfirmed).Return(currentSlot, nil)
+	networkMock.On("GetEpochInfo", mock.Anything, rpc.CommitmentProcessed).Return(&rpc.GetEpochInfoResult{
+		AbsoluteSlot: currentSlot + 100,
+		SlotIndex:    100,
+		Epoch:        1,
+	}, nil)
 	networkMock.On("GetLeaderSchedule", mock.Anything).Return(leaderSchedule, nil)
 
 	// Test the function
@@ -993,6 +1008,11 @@ func TestGossipClient_GetTimeToNextLeaderSlotForPubkey_GetLeaderScheduleError(t 
 	pubkey := createTestPublicKey(1)
 
 	networkMock.On("GetSlot", mock.Anything, rpc.CommitmentConfirmed).Return(currentSlot, nil)
+	networkMock.On("GetEpochInfo", mock.Anything, rpc.CommitmentProcessed).Return(&rpc.GetEpochInfoResult{
+		AbsoluteSlot: currentSlot + 100,
+		SlotIndex:    100,
+		Epoch:        1,
+	}, nil)
 	networkMock.On("GetLeaderSchedule", mock.Anything).Return(rpc.GetLeaderScheduleResult{}, errors.New("leader schedule not available"))
 
 	// Test the function
@@ -1021,6 +1041,11 @@ func TestGossipClient_GetTimeToNextLeaderSlotForPubkey_GetBlockTimeError(t *test
 	}
 
 	networkMock.On("GetSlot", mock.Anything, rpc.CommitmentConfirmed).Return(currentSlot, nil)
+	networkMock.On("GetEpochInfo", mock.Anything, rpc.CommitmentProcessed).Return(&rpc.GetEpochInfoResult{
+		AbsoluteSlot: currentSlot + 100,
+		SlotIndex:    100,
+		Epoch:        1,
+	}, nil)
 	networkMock.On("GetLeaderSchedule", mock.Anything).Return(leaderSchedule, nil)
 	networkMock.On("GetBlockTime", mock.Anything, nextLeaderSlot).Return((*solanago.UnixTimeSeconds)(nil), errors.New("block time not available"))
 
@@ -1083,6 +1108,11 @@ func BenchmarkGossipClient_GetTimeToNextLeaderSlotForPubkey(b *testing.B) {
 	}
 
 	mockClient.On("GetSlot", mock.Anything, rpc.CommitmentConfirmed).Return(currentSlot, nil)
+	mockClient.On("GetEpochInfo", mock.Anything, rpc.CommitmentProcessed).Return(&rpc.GetEpochInfoResult{
+		AbsoluteSlot: currentSlot + 100,
+		SlotIndex:    100,
+		Epoch:        1,
+	}, nil)
 	mockClient.On("GetLeaderSchedule", mock.Anything).Return(leaderSchedule, nil)
 	mockClient.On("GetBlockTime", mock.Anything, nextLeaderSlot).Return(&expectedBlockTime, nil)
 
